@@ -27,6 +27,7 @@ services:
     secrets:
       - jenkins_admin_password
       - jenkins_audit_password
+      - xhsmedium_scm_token
       - build_agent_ssh_private_key
       - regression_agent_ssh_private_key
     networks:
@@ -163,6 +164,8 @@ secrets:
     file: ./.secrets/jenkins_admin_password
   jenkins_audit_password:
     file: ./.secrets/jenkins_audit_password
+  xhsmedium_scm_token:
+    file: ./.secrets/xhsmedium_scm_token
   build_agent_ssh_private_key:
     file: ./.secrets/build_agent_ssh_key
   build_agent_ssh_public_key:

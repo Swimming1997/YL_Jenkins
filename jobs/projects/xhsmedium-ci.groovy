@@ -33,10 +33,28 @@ pipeline {
                 script {
                     def requested = validateGitRef(branch: params.BRANCH, sha: params.GIT_SHA)
                     env.CI_BRANCH = requested.branch
-                    env.RESOLVED_SHA = requested.sha ?: sh(
-                        returnStdout: true,
-                        script: 'git ls-remote --exit-code --heads "$XHSMEDIUM_REPOSITORY" "refs/heads/$CI_BRANCH" | cut -f1'
-                    ).trim()
+                    if (requested.sha) {
+                        env.RESOLVED_SHA = requested.sha
+                    } else {
+                        withCredentials([usernamePassword(
+                            credentialsId: 'xhsmedium-scm-readonly',
+                            usernameVariable: 'SCM_USER',
+                            passwordVariable: 'SCM_TOKEN'
+                        )]) {
+                            writeFile(
+                                file: '.git-askpass.sh',
+                                text: '#!/bin/sh\ncase "$1" in\n  *Username*) printf "%s\\n" "$SCM_USER" ;;\n  *Password*) printf "%s\\n" "$SCM_TOKEN" ;;\n  *) exit 1 ;;\nesac\n'
+                            )
+                            try {
+                                env.RESOLVED_SHA = sh(
+                                    returnStdout: true,
+                                    script: 'set +x; chmod 700 .git-askpass.sh; GIT_ASKPASS="$WORKSPACE/.git-askpass.sh" GIT_ASKPASS_REQUIRE=force git ls-remote --exit-code --heads "$XHSMEDIUM_REPOSITORY" "refs/heads/$CI_BRANCH" | cut -f1'
+                                ).trim()
+                            } finally {
+                                sh 'rm -f .git-askpass.sh'
+                            }
+                        }
+                    }
                     env.RESOLVED_SHA = validateGitRef(branch: env.CI_BRANCH, sha: env.RESOLVED_SHA).sha
                     echo "RESOLVED_SHA=${env.RESOLVED_SHA}"
                 }
@@ -44,7 +62,11 @@ pipeline {
         }
         stage('Checkout') {
             steps {
-                platformCheckout(url: env.XHSMEDIUM_REPOSITORY, sha: env.RESOLVED_SHA)
+                platformCheckout(
+                    url: env.XHSMEDIUM_REPOSITORY,
+                    sha: env.RESOLVED_SHA,
+                    credentialsId: 'xhsmedium-scm-readonly'
+                )
                 sh 'set -eu; test "$(git rev-parse HEAD)" = "$RESOLVED_SHA"; test "$(git remote get-url origin)" = "$XHSMEDIUM_REPOSITORY"'
                 recordBuildMetadata(
                     repository: env.XHSMEDIUM_REPOSITORY,

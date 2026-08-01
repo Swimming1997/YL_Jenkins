@@ -22,6 +22,8 @@
 
 Jenkins、Java、Node.js 和数据库均不需要安装到宿主机。
 
+XHSMedium 私有仓库接入还要求 `.secrets/xhsmedium_scm_token` 存在，其中保存仅授权 `MuFannnn/xhsmedium`、权限为 `Contents: Read-only` 的 GitHub Fine-grained PAT。该文件已被 Git 忽略，禁止提交或复制到日志。
+
 ## 启动
 
 ```powershell

@@ -1,13 +1,16 @@
 # XHSMedium 只读 CI
 
-`XHSMedium/CI/read-only` 是 P3A 试点作业。它只从固定的公开仓库读取源码，在隔离 Build Agent 中验证项目，不修改业务仓库、不发布制品、不部署，也不连接数据库或业务外部系统。
+`XHSMedium/CI/read-only` 是 P3A 试点作业。它只从固定的私有仓库读取源码，在隔离 Build Agent 中验证项目，不修改业务仓库、不发布制品、不部署，也不连接数据库或业务外部系统。
 
 ## 参数与源码身份
 
 - `BRANCH` 默认是 `dev`，只接受安全的 Git 分支名称。
 - `GIT_SHA` 可留空；非空时必须是完整的 40 位十六进制 SHA。
 - 仓库 URL 固定为 `https://github.com/MuFannnn/xhsmedium.git`，不能通过构建参数覆盖。
+- Jenkins 凭据 `xhsmedium-scm-readonly` 读取 `.secrets/xhsmedium_scm_token` 对应的 Docker Secret。Token 必须只授权该仓库的 `Contents: Read-only`。
 - 未指定 SHA 时，作业先通过 `git ls-remote` 将分支解析为 SHA，再按该 SHA Checkout。构建日志和 `ci-evidence/build-metadata.txt` 都记录最终身份。
+
+解析阶段通过无密钥的临时 `GIT_ASKPASS` 脚本读取 Jenkins 注入的环境变量；脚本随即删除并退出凭据作用域。项目源码和 npm 命令不会获得 Token，日志及归档也不得包含 Token。
 
 这是手工试点作业。P3A 不配置 Webhook、Multibranch Pipeline 或 GitHub 状态回写。
 
@@ -34,7 +37,7 @@ backend 的 `npm run lint` 当前包含 `--fix`，因此被明确排除。构建
 - backend Jest JSON；
 - backend、frontend、automation、regression 命令日志。
 
-这些内容仅证明对应 SHA 通过首期 CI 检查，不是 Release 制品。作业不含 Docker、数据库、FTP、飞书、OSS、浏览器 Profile、发布或部署操作，也不持有相关凭据。
+这些内容仅证明对应 SHA 通过首期 CI 检查，不是 Release 制品。除限定仓库的只读 SCM 凭据外，作业不含或持有 Docker、数据库、FTP、飞书、OSS、浏览器 Profile、发布或部署操作及其凭据。
 
 ## 验证
 

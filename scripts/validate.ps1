@@ -24,6 +24,9 @@ try {
     Assert-True ($LASTEXITCODE -eq 0) '.secrets is ignored by Git.'
     git check-ignore --quiet .secrets/build_agent_ssh_key
     Assert-True ($LASTEXITCODE -eq 0) 'Agent private keys are ignored by Git.'
+    git check-ignore --quiet .secrets/xhsmedium_scm_token
+    Assert-True ($LASTEXITCODE -eq 0) 'XHSMedium SCM token is ignored by Git.'
+    Assert-True ((Test-Path -LiteralPath '.secrets\xhsmedium_scm_token') -and (Get-Item -LiteralPath '.secrets\xhsmedium_scm_token').Length -gt 1) 'XHSMedium SCM token Secret exists and is non-empty.'
 
     $dockerfile = Get-Content -Raw -LiteralPath 'controller\Dockerfile'
     Assert-True ($dockerfile -match 'jenkins/jenkins:2\.568\.1-jdk21@sha256:[0-9a-f]{64}') 'Jenkins numeric LTS tag and digest are pinned.'
@@ -46,6 +49,10 @@ try {
     Assert-True ($securityConfig -match '\$\{trim:\$\{readFile:/run/secrets/jenkins_admin_password\}\}') 'Administrator password uses Docker Secret file interpolation.'
     Assert-True ($securityConfig -match '\$\{trim:\$\{readFile:/run/secrets/jenkins_audit_password\}\}') 'Audit password uses Docker Secret file interpolation.'
 
+    $credentialsConfig = Get-Content -Raw -LiteralPath 'jcasc\credentials.yaml'
+    Assert-True ($credentialsConfig -match 'id:\s*"xhsmedium-scm-readonly"') 'XHSMedium read-only SCM credential has a fixed Jenkins ID.'
+    Assert-True ($credentialsConfig -match '\$\{trim:\$\{readFile:/run/secrets/xhsmedium_scm_token\}\}') 'XHSMedium SCM credential uses Docker Secret file interpolation.'
+
     $jenkinsConfig = Get-Content -Raw -LiteralPath 'jcasc\jenkins.yaml'
     Assert-True ($jenkinsConfig -match 'numExecutors:\s*0') 'Controller executor count is configured as zero.'
     Assert-True ($jenkinsConfig -match 'slaveAgentPort:\s*-1') 'Inbound agent TCP port is disabled.'
@@ -60,14 +67,21 @@ try {
     Assert-True ($xhsmediumCi -match "XHSMEDIUM_REPOSITORY = 'https://github.com/MuFannnn/xhsmedium.git'") 'XHSMedium repository URL is fixed in the job.'
     Assert-True ($xhsmediumCi -match "agent \{ label 'xhsmedium-build' \}") 'XHSMedium CI is restricted to the Build Agent.'
     Assert-True ($xhsmediumCi -match 'disableConcurrentBuilds\(abortPrevious: true\)') 'XHSMedium CI replaces an overlapping build.'
+    Assert-True ($xhsmediumCi -match "credentialsId: 'xhsmedium-scm-readonly'") 'XHSMedium CI uses only the fixed read-only SCM credential.'
+    Assert-True ($xhsmediumCi -match 'GIT_ASKPASS_REQUIRE=force') 'XHSMedium branch resolution uses non-interactive Git credential handling.'
+    Assert-True ($xhsmediumCi -notmatch 'https://[^\s"'']*\$SCM_(?:USER|TOKEN)') 'XHSMedium CI never embeds SCM credentials in a URL.'
     Assert-True ($xhsmediumCi -match 'git diff --exit-code -- \.') 'XHSMedium CI checks that tracked source files remain unchanged.'
     Assert-True ($xhsmediumCi -notmatch '(?i)docker\s+(?:build|compose|run)|ftp://|feishu|aliyun|ossutil') 'XHSMedium CI contains no Docker, FTP, Feishu, or OSS operation.'
 
     $composeText = Get-Content -Raw -LiteralPath 'compose.yaml'
+    $controllerCompose = [regex]::Match($composeText, '(?ms)^  controller:.*?(?=^  build-agent:)').Value
+    $buildAgentCompose = [regex]::Match($composeText, '(?ms)^  build-agent:.*?(?=^  regression-agent:)').Value
     Assert-True ($composeText -notmatch '/var/run/docker\.sock') 'Host Docker Socket is not referenced.'
     Assert-True (([regex]::Matches($composeText, '(?m)^\s+privileged:\s+true\s*$')).Count -eq 1) 'Exactly one service, isolated DIND, is privileged.'
     Assert-True ($composeText -match '(?s)build-agent:.*?networks:\s*\r?\n\s*- control') 'Build Agent is attached to the control network.'
     Assert-True ($composeText -match '(?s)regression-agent:.*?regression_docker') 'Regression Agent is attached to the isolated Docker network.'
+    Assert-True ($controllerCompose -match '(?s)secrets:.*?- xhsmedium_scm_token') 'Controller receives the XHSMedium SCM Docker Secret.'
+    Assert-True ($buildAgentCompose -notmatch 'xhsmedium_scm_token') 'Build Agent does not mount the XHSMedium SCM Docker Secret.'
 
     docker compose config --quiet
     Assert-True ($LASTEXITCODE -eq 0) 'Docker Compose configuration is valid.'
