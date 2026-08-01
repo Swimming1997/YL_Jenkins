@@ -43,7 +43,7 @@ pipeline {
                         )]) {
                             writeFile(
                                 file: '.git-askpass.sh',
-                                text: '#!/bin/sh\ncase "$1" in\n  *Username*) printf "%s\\n" "$SCM_USER" ;;\n  *Password*) printf "%s\\n" "$SCM_TOKEN" ;;\n  *) exit 1 ;;\nesac\n'
+                                text: '#!/bin/sh\\ncase "$1" in\\n  *Username*) printf "%s\\\\n" "$SCM_USER" ;;\\n  *Password*) printf "%s\\\\n" "$SCM_TOKEN" ;;\\n  *) exit 1 ;;\\nesac\\n'
                             )
                             try {
                                 env.RESOLVED_SHA = sh(
