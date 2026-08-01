@@ -16,7 +16,6 @@ pipeline {
         XHSMEDIUM_REPOSITORY = 'https://github.com/MuFannnn/xhsmedium.git'
         CI = 'true'
         NEXT_TELEMETRY_DISABLED = '1'
-        NODE_OPTIONS = '--max-old-space-size=768'
         GIT_TERMINAL_PROMPT = '0'
         npm_config_audit = 'false'
         npm_config_fund = 'false'
@@ -79,6 +78,7 @@ pipeline {
             }
         }
         stage('Backend') {
+            environment { NODE_OPTIONS = '--max-old-space-size=704' }
             steps {
                 nodeModuleCi(
                     module: 'backend',
@@ -92,6 +92,7 @@ pipeline {
             }
         }
         stage('Frontend') {
+            environment { NODE_OPTIONS = '--max-old-space-size=512' }
             steps {
                 nodeModuleCi(
                     module: 'frontend',
@@ -106,6 +107,7 @@ pipeline {
             }
         }
         stage('Automation') {
+            environment { NODE_OPTIONS = '--max-old-space-size=512' }
             steps {
                 nodeModuleCi(
                     module: 'automation',
@@ -119,6 +121,7 @@ pipeline {
             }
         }
         stage('Regression control plane') {
+            environment { NODE_OPTIONS = '--max-old-space-size=512' }
             steps {
                 nodeModuleCi(
                     module: 'regression',

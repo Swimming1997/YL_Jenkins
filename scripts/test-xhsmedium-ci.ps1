@@ -48,7 +48,7 @@ try {
     Assert-True ($null -ne $build -and -not $build.building) "Build $buildNumber completed within $TimeoutMinutes minutes."
     $console = (Invoke-WebRequest -UseBasicParsing -Uri "$jobUrl/$buildNumber/consoleText" -Headers $adminHeaders -TimeoutSec 20).Content
     if ($build.result -ne 'SUCCESS') {
-        $firstFailure = ($console -split "`r?`n" | Where-Object { $_ -match '(?i)(npm ERR!|FAIL|ERROR|Exception|script returned exit code)' } | Select-Object -First 1)
+        $firstFailure = ($console -split "`r?`n" | ForEach-Object { $_ -replace "`e\[[0-9;?]*[ -/]*[@-~]", '' } | Where-Object { $_ -match '(?i)(FATAL ERROR|^Killed$|npm ERR!|Test Suites:.*failed|^ERROR:|Exception|script returned exit code)' } | Select-Object -First 1)
         if (-not $firstFailure) { $firstFailure = 'No concise failure line was found; inspect the Jenkins console.' }
         throw "XHSMedium CI build $buildNumber was $($build.result). First failure: $firstFailure Build: $jobUrl/$buildNumber/"
     }
