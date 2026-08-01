@@ -133,7 +133,7 @@ try {
         $dindInspect = (docker inspect $serviceIds['regression-docker'] | ConvertFrom-Json)[0]
         Assert-True (-not @($buildInspect.NetworkSettings.Ports.PSObject.Properties | Where-Object Value).Count) 'Build Agent publishes no host port.'
         $buildWorkspaceOptions = (docker exec $serviceIds['build-agent'] findmnt -no OPTIONS /home/jenkins/agent).Trim() -split ','
-        Assert-True ($buildWorkspaceOptions -contains 'exec') 'Running Build Agent Workspace permits CI tool execution.'
+        Assert-True ($buildWorkspaceOptions -notcontains 'noexec') 'Running Build Agent Workspace permits CI tool execution.'
         Assert-True ($buildWorkspaceOptions -contains 'nosuid' -and $buildWorkspaceOptions -contains 'nodev') 'Running Build Agent Workspace retains nosuid and nodev isolation.'
         Assert-True (-not @($regressionInspect.NetworkSettings.Ports.PSObject.Properties | Where-Object Value).Count) 'Regression Agent publishes no host port.'
         Assert-True ($dindInspect.HostConfig.Privileged) 'Isolated DIND is privileged.'
