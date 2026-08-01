@@ -22,6 +22,8 @@ try {
     Assert-True ($LASTEXITCODE -eq 0) '.env is ignored by Git.'
     git check-ignore --quiet .secrets/jenkins_admin_password
     Assert-True ($LASTEXITCODE -eq 0) '.secrets is ignored by Git.'
+    git check-ignore --quiet .secrets/build_agent_ssh_key
+    Assert-True ($LASTEXITCODE -eq 0) 'Agent private keys are ignored by Git.'
 
     $dockerfile = Get-Content -Raw -LiteralPath 'controller\Dockerfile'
     Assert-True ($dockerfile -match 'jenkins/jenkins:2\.568\.1-jdk21@sha256:[0-9a-f]{64}') 'Jenkins numeric LTS tag and digest are pinned.'
@@ -32,11 +34,11 @@ try {
 
     $pluginNames = $plugins | ForEach-Object { ($_ -split ':', 2)[0] }
     Assert-True (($pluginNames | Sort-Object -Unique).Count -eq $pluginNames.Count) 'Plugin list has no duplicate IDs.'
-    foreach ($required in @('configuration-as-code', 'job-dsl', 'workflow-aggregator', 'git', 'credentials-binding', 'matrix-auth', 'role-strategy', 'docker-workflow')) {
+    foreach ($required in @('configuration-as-code', 'job-dsl', 'workflow-aggregator', 'git', 'credentials-binding', 'matrix-auth', 'role-strategy', 'docker-workflow', 'ssh-slaves', 'trilead-api')) {
         Assert-True ($pluginNames -contains $required) "Required plugin '$required' is locked."
     }
 
-    foreach ($configFile in @('jcasc\jenkins.yaml', 'jcasc\security.yaml', 'jcasc\authorization.yaml', 'jcasc\jobs.yaml', 'jobs\folders.groovy', 'jobs\seed.groovy')) {
+    foreach ($configFile in @('jcasc\jenkins.yaml', 'jcasc\security.yaml', 'jcasc\authorization.yaml', 'jcasc\jobs.yaml', 'jcasc\agents.yaml', 'jcasc\credentials.yaml', 'jobs\folders.groovy', 'jobs\seed.groovy', 'agents\build\Dockerfile', 'agents\regression\Dockerfile')) {
         Assert-True (Test-Path -LiteralPath $configFile) "Configuration file '$configFile' exists."
     }
 
@@ -51,6 +53,12 @@ try {
     $libraryConfig = Get-Content -Raw -LiteralPath 'jcasc\jobs.yaml'
     Assert-True ($libraryConfig -match 'https://github.com/Swimming1997/YL_Jenkins.git|\$\{JENKINS_LIBRARY_URL\}') 'SCM Shared Library URL is configured.'
     Assert-True ($libraryConfig -match 'libraryPath:\s*"shared-library"') 'SCM Shared Library path is configured.'
+
+    $composeText = Get-Content -Raw -LiteralPath 'compose.yaml'
+    Assert-True ($composeText -notmatch '/var/run/docker\.sock') 'Host Docker Socket is not referenced.'
+    Assert-True (([regex]::Matches($composeText, '(?m)^\s+privileged:\s+true\s*$')).Count -eq 1) 'Exactly one service, isolated DIND, is privileged.'
+    Assert-True ($composeText -match '(?s)build-agent:.*?networks:\s*\r?\n\s*- control') 'Build Agent is attached to the control network.'
+    Assert-True ($composeText -match '(?s)regression-agent:.*?regression_docker') 'Regression Agent is attached to the isolated Docker network.'
 
     docker compose config --quiet
     Assert-True ($LASTEXITCODE -eq 0) 'Docker Compose configuration is valid.'
@@ -85,6 +93,24 @@ try {
         $headers = @{ Authorization = "Basic $pair" }
         $computer = Invoke-RestMethod -Uri "http://$published/computer/(built-in)/api/json" -Headers $headers -TimeoutSec 15
         Assert-True ([int]$computer.numExecutors -eq 0) 'Running Controller executor count is zero.'
+
+        $serviceIds = @{}
+        foreach ($service in @('build-agent', 'regression-agent', 'regression-docker')) {
+            $serviceId = (docker compose ps --quiet $service).Trim()
+            Assert-True ([bool]$serviceId) "Service '$service' exists."
+            $serviceHealth = (docker inspect --format '{{.State.Health.Status}}' $serviceId).Trim()
+            Assert-True ($serviceHealth -eq 'healthy') "Service '$service' is healthy."
+            $serviceIds[$service] = $serviceId
+        }
+
+        $buildInspect = (docker inspect $serviceIds['build-agent'] | ConvertFrom-Json)[0]
+        $regressionInspect = (docker inspect $serviceIds['regression-agent'] | ConvertFrom-Json)[0]
+        $dindInspect = (docker inspect $serviceIds['regression-docker'] | ConvertFrom-Json)[0]
+        Assert-True (-not @($buildInspect.NetworkSettings.Ports.PSObject.Properties | Where-Object Value).Count) 'Build Agent publishes no host port.'
+        Assert-True (-not @($regressionInspect.NetworkSettings.Ports.PSObject.Properties | Where-Object Value).Count) 'Regression Agent publishes no host port.'
+        Assert-True ($dindInspect.HostConfig.Privileged) 'Isolated DIND is privileged.'
+        $socketMounts = @($buildInspect, $regressionInspect, $dindInspect | ForEach-Object { $_.Mounts } | Where-Object { $_.Source -match 'docker\.sock' })
+        Assert-True ($socketMounts.Count -eq 0) 'Agent services do not mount the host Docker Socket.'
     }
 
     $global:LASTEXITCODE = 0

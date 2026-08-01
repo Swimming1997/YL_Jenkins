@@ -1,6 +1,6 @@
 # Jenkins Platform
 
-本仓库提供可重建的 Jenkins 平台。当前实现范围为 G0～P1：在本地 Docker Desktop 的 Linux 容器中运行 Jenkins Controller，并通过 JCasC、Role Strategy 和 Job DSL 自动恢复基础配置、认证、权限与 Folder。
+本仓库提供可重建的 Jenkins 平台。当前实现范围为 G0～P2：在本地 Docker Desktop 中运行 Jenkins Controller、隔离 Build/Regression Agent 和专用 Docker-in-Docker，并通过 JCasC、Role Strategy 和 Job DSL 自动恢复平台配置。
 
 ## 当前基线
 
@@ -8,7 +8,7 @@
 - 官方镜像 digest：`sha256:f4f65e6cd1405cd889b7f5ac33f9d5cdc2a099de6b87fe8a3933b9c5d53d1d02`
 - 容器端口：`8080`，仅绑定宿主机 `127.0.0.1`
 - 数据目录：Docker named volume `jenkins_platform_home`
-- Agent：首期基线为 Linux；P0 尚未创建 Agent
+- Agent：Linux Build Agent 与隔离 Regression Agent
 - 平台 Git 远端：`https://github.com/Swimming1997/YL_Jenkins.git`
 - 全局 Shared Library：`jenkins-platform-library`，默认版本 `main`
 
@@ -50,6 +50,8 @@ Get-Content .\.secrets\jenkins_admin_password
 ```powershell
 .\scripts\validate.ps1 -Runtime
 .\scripts\test-authorization.ps1 -RunLibrarySmoke
+.\scripts\test-shared-library.ps1
+.\scripts\test-agents.ps1
 ```
 
 验证数据卷在容器重建后仍然保留数据：
@@ -94,6 +96,7 @@ docker compose down
 ## 安全边界
 
 - 不把 Docker Socket 挂载到 Controller。
+- 不把宿主机 Docker Socket 挂载到任何 Agent；Regression Agent 仅连接专用 TLS DIND。
 - 不向不可信 PR 提供发布、生产或高权限 Docker 凭据。
 - 不在仓库保存真实密码、Token、Cookie 或连接串。
 - 当前不调用 FTP、飞书、生产数据库或其他真实外部系统。
@@ -106,3 +109,5 @@ docker compose down
 - `docs/configuration-as-code.md`：JCasC、Job DSL 与 Shared Library
 - `docs/authorization.md`：本地账户和角色权限
 - `docs/backup-and-recovery.md`：备份、恢复和演练
+- `docs/agents.md`：Agent 标签、连接和验证
+- `docs/docker-isolation.md`：专用 DIND 与清理边界

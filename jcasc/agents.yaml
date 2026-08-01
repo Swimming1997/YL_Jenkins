@@ -1,0 +1,38 @@
+jenkins:
+  nodes:
+    - permanent:
+        name: "build-agent"
+        remoteFS: "/home/jenkins/agent"
+        numExecutors: 1
+        mode: EXCLUSIVE
+        labelString: "linux node20 xhsmedium-build"
+        launcher:
+          ssh:
+            host: "build-agent"
+            port: 22
+            credentialsId: "build-agent-ssh"
+            javaPath: "/opt/java/openjdk/bin/java"
+            launchTimeoutSeconds: 60
+            maxNumRetries: 10
+            retryWaitTime: 10
+            sshHostKeyVerificationStrategy:
+              nonVerifyingKeyVerificationStrategy: {}
+        retentionStrategy: "always"
+    - permanent:
+        name: "regression-agent"
+        remoteFS: "/home/jenkins/agent"
+        numExecutors: 1
+        mode: EXCLUSIVE
+        labelString: "linux node20 docker-isolated xhsmedium-regression"
+        launcher:
+          ssh:
+            host: "regression-agent"
+            port: 22
+            credentialsId: "regression-agent-ssh"
+            javaPath: "/usr/bin/java"
+            launchTimeoutSeconds: 60
+            maxNumRetries: 10
+            retryWaitTime: 10
+            sshHostKeyVerificationStrategy:
+              nonVerifyingKeyVerificationStrategy: {}
+        retentionStrategy: "always"

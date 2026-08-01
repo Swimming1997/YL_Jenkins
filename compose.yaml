@@ -27,6 +27,13 @@ services:
     secrets:
       - jenkins_admin_password
       - jenkins_audit_password
+      - build_agent_ssh_private_key
+      - regression_agent_ssh_private_key
+    networks:
+      - control
+    mem_limit: 1536m
+    cpus: 2.0
+    pids_limit: 512
     healthcheck:
       test: ["CMD-SHELL", "curl --fail --silent --show-error http://127.0.0.1:8080/login >/dev/null"]
       interval: 10s
@@ -36,12 +43,131 @@ services:
     security_opt:
       - no-new-privileges:true
 
+  build-agent:
+    build:
+      context: .
+      dockerfile: agents/build/Dockerfile
+    image: jenkins-platform/build-agent:node20
+    restart: unless-stopped
+    secrets:
+      - build_agent_ssh_public_key
+    networks:
+      - control
+    tmpfs:
+      - /home/jenkins/agent:size=512m,uid=1000,gid=1000,mode=0700
+    healthcheck:
+      test: ["CMD-SHELL", "ssh-keyscan -T 3 -p 22 127.0.0.1 >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - NET_BIND_SERVICE
+      - SETGID
+      - SETUID
+      - SYS_CHROOT
+    mem_limit: 1g
+    cpus: 2.0
+    pids_limit: 256
+
+  regression-agent:
+    build:
+      context: .
+      dockerfile: agents/regression/Dockerfile
+    image: jenkins-platform/regression-agent:node20-playwright1.59.1
+    restart: unless-stopped
+    environment:
+      DOCKER_HOST: tcp://regression-docker:2376
+      DOCKER_TLS_VERIFY: "1"
+      DOCKER_CERT_PATH: /certs/client
+    secrets:
+      - regression_agent_ssh_public_key
+    volumes:
+      - regression_docker_certs:/certs/client:ro
+    tmpfs:
+      - /home/jenkins/agent:size=768m,uid=1002,gid=1002,mode=0700
+    networks:
+      - control
+      - regression_docker
+    depends_on:
+      regression-docker:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "ssh-keyscan -T 3 -p 22 127.0.0.1 >/dev/null 2>&1 && docker info >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - NET_BIND_SERVICE
+      - SETGID
+      - SETUID
+      - SYS_CHROOT
+    mem_limit: 1g
+    cpus: 2.0
+    pids_limit: 256
+
+  regression-docker:
+    image: docker:29.3.1-dind@sha256:686d2c5464787b0ca42420e0aa03a94fc9781ff9bf8b5ff947614b9fa4c3c3e0
+    hostname: regression-docker
+    restart: unless-stopped
+    privileged: true
+    environment:
+      DOCKER_TLS_CERTDIR: /certs
+    volumes:
+      - regression_docker_certs:/certs/client
+      - regression_docker_data:/var/lib/docker
+    networks:
+      - regression_docker
+    healthcheck:
+      test: ["CMD", "docker", "info"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    mem_limit: 4g
+    cpus: 6.0
+    pids_limit: 1024
+
 volumes:
   jenkins_home:
     name: ${JENKINS_VOLUME_NAME:-jenkins_platform_home}
+  regression_docker_certs:
+    name: ${REGRESSION_DOCKER_CERTS_VOLUME:-jenkins_platform_regression_docker_certs}
+  regression_docker_data:
+    name: ${REGRESSION_DOCKER_DATA_VOLUME:-jenkins_platform_regression_docker_data}
+
+networks:
+  control:
+    name: ${CONTROL_NETWORK_NAME:-jenkins_platform_control}
+  regression_docker:
+    name: ${REGRESSION_DOCKER_NETWORK_NAME:-jenkins_platform_regression_docker}
+    internal: true
 
 secrets:
   jenkins_admin_password:
     file: ./.secrets/jenkins_admin_password
   jenkins_audit_password:
     file: ./.secrets/jenkins_audit_password
+  build_agent_ssh_private_key:
+    file: ./.secrets/build_agent_ssh_key
+  build_agent_ssh_public_key:
+    file: ./.secrets/build_agent_ssh_key.pub
+  regression_agent_ssh_private_key:
+    file: ./.secrets/regression_agent_ssh_key
+  regression_agent_ssh_public_key:
+    file: ./.secrets/regression_agent_ssh_key.pub

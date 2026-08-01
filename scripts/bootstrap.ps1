@@ -20,13 +20,14 @@ try {
     }
 
     & (Join-Path $PSScriptRoot 'generate-secrets.ps1')
+    & (Join-Path $PSScriptRoot 'generate-agent-keys.ps1')
 
     docker compose config --quiet
     if ($LASTEXITCODE -ne 0) { throw 'docker compose config validation failed.' }
 
     $arguments = @('compose', 'up', '--detach')
     if (-not $NoBuild) { $arguments += '--build' }
-    $arguments += 'controller'
+    $arguments += @('regression-docker', 'build-agent', 'regression-agent', 'controller')
     & docker @arguments
     if ($LASTEXITCODE -ne 0) { throw 'Jenkins startup failed.' }
 
@@ -38,7 +39,8 @@ try {
             if ($health -eq 'healthy') {
                 $published = (docker compose port controller 8080).Trim()
                 Write-Host "Jenkins is healthy at http://$published"
-                Write-Host 'Local account passwords are stored in the Git-ignored .secrets directory.'
+                Write-Host 'Jenkins Controller is healthy. Agent connectivity is verified separately.'
+                Write-Host 'Local credentials are stored in the Git-ignored .secrets directory.'
                 exit 0
             }
             if ($health -eq 'unhealthy') {
