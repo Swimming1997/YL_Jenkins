@@ -68,6 +68,7 @@ try {
     Assert-True ($xhsmediumCi -match "agent \{ label 'xhsmedium-build' \}") 'XHSMedium CI is restricted to the Build Agent.'
     Assert-True ($xhsmediumCi -match 'disableConcurrentBuilds\(abortPrevious: true\)') 'XHSMedium CI replaces an overlapping build.'
     Assert-True ($xhsmediumCi -match "credentialsId: 'xhsmedium-scm-readonly'") 'XHSMedium CI uses only the fixed read-only SCM credential.'
+    Assert-True ($xhsmediumCi -match "NODE_OPTIONS = '--max-old-space-size=768'") 'XHSMedium CI bounds Node heap below the Build Agent memory limit.'
     Assert-True ($xhsmediumCi -match 'GIT_ASKPASS_REQUIRE=force') 'XHSMedium branch resolution uses non-interactive Git credential handling.'
     Assert-True ($xhsmediumCi -match 'rm -f .*SCM_ASKPASS_PATH') 'XHSMedium CI explicitly cleans its temporary SCM AskPass wrapper.'
     Assert-True ($xhsmediumCi -notmatch 'https://[^\s"'']*\$SCM_(?:USER|TOKEN)') 'XHSMedium CI never embeds SCM credentials in a URL.'

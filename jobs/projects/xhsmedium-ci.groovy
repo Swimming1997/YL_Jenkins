@@ -16,6 +16,7 @@ pipeline {
         XHSMEDIUM_REPOSITORY = 'https://github.com/MuFannnn/xhsmedium.git'
         CI = 'true'
         NEXT_TELEMETRY_DISABLED = '1'
+        NODE_OPTIONS = '--max-old-space-size=768'
         GIT_TERMINAL_PROMPT = '0'
         npm_config_audit = 'false'
         npm_config_fund = 'false'
