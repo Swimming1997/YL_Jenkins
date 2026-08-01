@@ -24,6 +24,15 @@ jenkins:
         numExecutors: 1
         mode: EXCLUSIVE
         labelString: "linux node20 docker-isolated xhsmedium-regression"
+        nodeProperties:
+          - envVars:
+              env:
+                - key: "DOCKER_HOST"
+                  value: "tcp://regression-docker:2376"
+                - key: "DOCKER_TLS_VERIFY"
+                  value: "1"
+                - key: "DOCKER_CERT_PATH"
+                  value: "/certs/client"
         launcher:
           ssh:
             host: "regression-agent"

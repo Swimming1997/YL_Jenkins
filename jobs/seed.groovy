@@ -81,12 +81,17 @@ pipeline {
             steps {
                 sh 'java -version && git --version && node --version && npm --version && docker --version && docker compose version'
                 sh 'docker info >/dev/null'
-                sh 'docker run --rm alpine@sha256:14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce /bin/true'
+                sh 'docker volume create "p2-smoke-${BUILD_NUMBER}" >/dev/null && docker volume rm "p2-smoke-${BUILD_NUMBER}" >/dev/null'
                 echo 'REGRESSION_AGENT_OK'
             }
         }
     }
-    post { always { cleanupWorkspace() } }
+    post {
+        always {
+            sh 'docker volume rm "p2-smoke-${BUILD_NUMBER}" >/dev/null 2>&1 || true'
+            cleanupWorkspace()
+        }
+    }
 }
 '''.stripIndent())
         }

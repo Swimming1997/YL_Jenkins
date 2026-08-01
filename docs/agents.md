@@ -11,6 +11,8 @@ P2 使用两个静态 Linux SSH Agent。Controller executor 保持为 0，业务
 
 Agent SSH 端口只存在于 Docker `control`网络，不映射到宿主机。P2 本地环境使用 non-verifying host-key 策略，以允许容器重建后自动重连；该策略只能用于不对外开放的本地 control 网络。云端必须改为固定 known_hosts 或受控短生命周期 Agent。
 
+Agent Workspace 使用逻辑容量 2 GiB 的 tmpfs，以高于 Jenkins 默认磁盘阈值；tmpfs 不预分配内存，实际使用仍受每个 Agent 的 1 GiB 容器内存上限约束。
+
 ## 验证
 
 ```powershell
