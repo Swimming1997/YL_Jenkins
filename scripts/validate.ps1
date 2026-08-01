@@ -38,7 +38,7 @@ try {
         Assert-True ($pluginNames -contains $required) "Required plugin '$required' is locked."
     }
 
-    foreach ($configFile in @('jcasc\jenkins.yaml', 'jcasc\security.yaml', 'jcasc\authorization.yaml', 'jcasc\jobs.yaml', 'jcasc\agents.yaml', 'jcasc\credentials.yaml', 'jobs\folders.groovy', 'jobs\seed.groovy', 'agents\build\Dockerfile', 'agents\regression\Dockerfile')) {
+    foreach ($configFile in @('jcasc\jenkins.yaml', 'jcasc\security.yaml', 'jcasc\authorization.yaml', 'jcasc\jobs.yaml', 'jcasc\agents.yaml', 'jcasc\credentials.yaml', 'jobs\folders.groovy', 'jobs\seed.groovy', 'jobs\projects\xhsmedium-ci.groovy', 'shared-library\vars\validateGitRef.groovy', 'shared-library\vars\nodeModuleCi.groovy', 'shared-library\vars\recordBuildMetadata.groovy', 'agents\build\Dockerfile', 'agents\regression\Dockerfile')) {
         Assert-True (Test-Path -LiteralPath $configFile) "Configuration file '$configFile' exists."
     }
 
@@ -53,6 +53,15 @@ try {
     $libraryConfig = Get-Content -Raw -LiteralPath 'jcasc\jobs.yaml'
     Assert-True ($libraryConfig -match 'https://github.com/Swimming1997/YL_Jenkins.git|\$\{JENKINS_LIBRARY_URL\}') 'SCM Shared Library URL is configured.'
     Assert-True ($libraryConfig -match 'libraryPath:\s*"shared-library"') 'SCM Shared Library path is configured.'
+    Assert-True ($libraryConfig -match 'job-dsl/projects/xhsmedium-ci\.groovy') 'XHSMedium read-only CI Job DSL is loaded by JCasC.'
+
+    $xhsmediumCi = Get-Content -Raw -LiteralPath 'jobs\projects\xhsmedium-ci.groovy'
+    Assert-True ($xhsmediumCi -match "pipelineJob\('XHSMedium/CI/read-only'\)") 'XHSMedium read-only CI job has the expected fixed path.'
+    Assert-True ($xhsmediumCi -match "XHSMEDIUM_REPOSITORY = 'https://github.com/MuFannnn/xhsmedium.git'") 'XHSMedium repository URL is fixed in the job.'
+    Assert-True ($xhsmediumCi -match "agent \{ label 'xhsmedium-build' \}") 'XHSMedium CI is restricted to the Build Agent.'
+    Assert-True ($xhsmediumCi -match 'disableConcurrentBuilds\(abortPrevious: true\)') 'XHSMedium CI replaces an overlapping build.'
+    Assert-True ($xhsmediumCi -match 'git diff --exit-code -- \.') 'XHSMedium CI checks that tracked source files remain unchanged.'
+    Assert-True ($xhsmediumCi -notmatch '(?i)docker\s+(?:build|compose|run)|ftp://|feishu|aliyun|ossutil') 'XHSMedium CI contains no Docker, FTP, Feishu, or OSS operation.'
 
     $composeText = Get-Content -Raw -LiteralPath 'compose.yaml'
     Assert-True ($composeText -notmatch '/var/run/docker\.sock') 'Host Docker Socket is not referenced.'

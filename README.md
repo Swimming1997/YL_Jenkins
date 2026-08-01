@@ -1,6 +1,6 @@
 # Jenkins Platform
 
-本仓库提供可重建的 Jenkins 平台。当前实现范围为 G0～P2：在本地 Docker Desktop 中运行 Jenkins Controller、隔离 Build/Regression Agent 和专用 Docker-in-Docker，并通过 JCasC、Role Strategy 和 Job DSL 自动恢复平台配置。
+本仓库提供可重建的 Jenkins 平台。当前实现范围为 G0～P3A：在本地 Docker Desktop 中运行 Jenkins Controller、隔离 Build/Regression Agent 和专用 Docker-in-Docker，并通过 JCasC、Role Strategy 和 Job DSL 自动恢复平台配置；XHSMedium 已接入手工只读 CI 试点。
 
 ## 当前基线
 
@@ -52,6 +52,7 @@ Get-Content .\.secrets\jenkins_admin_password
 .\scripts\test-authorization.ps1 -RunLibrarySmoke
 .\scripts\test-shared-library.ps1
 .\scripts\test-agents.ps1
+.\scripts\test-xhsmedium-ci.ps1 -Branch dev
 ```
 
 验证数据卷在容器重建后仍然保留数据：
@@ -111,3 +112,4 @@ docker compose down
 - `docs/backup-and-recovery.md`：备份、恢复和演练
 - `docs/agents.md`：Agent 标签、连接和验证
 - `docs/docker-isolation.md`：专用 DIND 与清理边界
+- `docs/xhsmedium-ci.md`：XHSMedium 手工只读 CI、证据和安全边界
