@@ -78,7 +78,7 @@ pipeline {
             }
         }
         stage('Backend') {
-            environment { NODE_OPTIONS = '--max-old-space-size=704' }
+            environment { NODE_OPTIONS = '--max-old-space-size=768' }
             steps {
                 nodeModuleCi(
                     module: 'backend',
