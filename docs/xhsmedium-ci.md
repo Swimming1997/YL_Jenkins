@@ -29,7 +29,7 @@ regression: npm ci → npm test
 
 Build Agent Workspace tmpfs 允许执行 Jenkins Git 包装及 `node_modules/.bin`，但仍保留 `nosuid`、`nodev`、`no-new-privileges`、能力裁剪和无 Docker/宿主机挂载边界。
 
-CI 在不提高 Build Agent 1 GiB 容器内存上限的情况下按模块限制 Node heap：backend 为 768 MiB，frontend、automation 和 regression 为 512 MiB。模块保持串行，避免 Node 与 Jenkins Agent JVM 共同触发 cgroup OOM。
+CI 在不提高 Build Agent 1 GiB 容器内存上限的情况下按模块限制 Node heap：backend 为 768 MiB，frontend 为 640 MiB，automation 和 regression 为 512 MiB。模块保持串行，避免 Node 与 Jenkins Agent JVM 共同触发 cgroup OOM。
 
 backend 的 `npm run lint` 当前包含 `--fix`，因此被明确排除。构建控制台和元数据会报告该质量缺口；在 XHSMedium 增加只读 `lint:check` 前，不能把该缺口解释为已通过。
 
