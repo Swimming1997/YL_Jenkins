@@ -55,7 +55,7 @@ services:
     networks:
       - control
     tmpfs:
-      - /home/jenkins/agent:size=2g,uid=1000,gid=1000,mode=0700
+      - /home/jenkins/agent:size=2g,uid=1000,gid=1000,mode=0700,exec
     healthcheck:
       test: ["CMD-SHELL", "ssh-keyscan -T 3 -p 22 127.0.0.1 >/dev/null 2>&1"]
       interval: 10s

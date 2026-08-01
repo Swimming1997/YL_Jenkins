@@ -27,6 +27,8 @@ regression: npm ci → npm test
 
 所有 npm 依赖均安装在容器内的临时 Workspace。作业禁止并发，后一次手工触发会取消仍在运行的前一次构建；全局超时为 45 分钟。无论成功、失败或超时，证据归档后都会删除 Workspace。
 
+Build Agent Workspace tmpfs 允许执行 Jenkins Git 包装及 `node_modules/.bin`，但仍保留 `nosuid`、`nodev`、`no-new-privileges`、能力裁剪和无 Docker/宿主机挂载边界。
+
 backend 的 `npm run lint` 当前包含 `--fix`，因此被明确排除。构建控制台和元数据会报告该质量缺口；在 XHSMedium 增加只读 `lint:check` 前，不能把该缺口解释为已通过。
 
 ## 证据与边界

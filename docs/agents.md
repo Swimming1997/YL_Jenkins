@@ -7,6 +7,8 @@ P2 使用两个静态 Linux SSH Agent。Controller executor 保持为 0，业务
 | Build Agent | `linux node20 xhsmedium-build` | Java 21、Git、Node 20、npm 10 | 无 Docker CLI、无 Docker Socket |
 | Regression Agent | `linux node20 docker-isolated xhsmedium-regression` | Java 21、Git、Node 20、npm 10、Playwright 1.59.1、Docker 29.3.1、Compose 5.1.1 | 只访问专用 TLS DIND |
 
+Build Agent 的 `/home/jenkins/agent` 是 2 GiB tmpfs。该挂载显式启用 `exec`，因为 Jenkins Git 凭据包装和 `node_modules/.bin` 必须在 Workspace 中执行；同时保留 `nosuid`、`nodev`、容器 `no-new-privileges`、能力裁剪、无 Docker CLI、无宿主机端口及构建后 Workspace 清理。
+
 两个 Agent 使用不同的 RSA PEM SSH 凭据。私钥只挂载到 Controller，公钥只挂载到对应 Agent。密钥文件位于 Git 忽略的 `.secrets/`，由 `scripts/generate-agent-keys.ps1`创建。
 
 Agent SSH 端口只存在于 Docker `control`网络，不映射到宿主机。P2 本地环境使用 non-verifying host-key 策略，以允许容器重建后自动重连；该策略只能用于不对外开放的本地 control 网络。云端必须改为固定 known_hosts 或受控短生命周期 Agent。
