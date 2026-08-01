@@ -35,7 +35,7 @@ pipeline {
                     env.CI_BRANCH = requested.branch
                     env.RESOLVED_SHA = requested.sha ?: sh(
                         returnStdout: true,
-                        script: """git ls-remote --exit-code --heads \"\$XHSMEDIUM_REPOSITORY\" \"refs/heads/\$CI_BRANCH\" | awk '{print \$1}'"""
+                        script: 'git ls-remote --exit-code --heads "$XHSMEDIUM_REPOSITORY" "refs/heads/$CI_BRANCH" | cut -f1'
                     ).trim()
                     env.RESOLVED_SHA = validateGitRef(branch: env.CI_BRANCH, sha: env.RESOLVED_SHA).sha
                     echo "RESOLVED_SHA=${env.RESOLVED_SHA}"
@@ -45,11 +45,7 @@ pipeline {
         stage('Checkout') {
             steps {
                 platformCheckout(url: env.XHSMEDIUM_REPOSITORY, sha: env.RESOLVED_SHA)
-                sh """#!/usr/bin/env bash
-set -euo pipefail
-test "\$(git rev-parse HEAD)" = "\$RESOLVED_SHA"
-test "\$(git remote get-url origin)" = "\$XHSMEDIUM_REPOSITORY"
-"""
+                sh 'set -eu; test "$(git rev-parse HEAD)" = "$RESOLVED_SHA"; test "$(git remote get-url origin)" = "$XHSMEDIUM_REPOSITORY"'
                 recordBuildMetadata(
                     repository: env.XHSMEDIUM_REPOSITORY,
                     branch: env.CI_BRANCH,
