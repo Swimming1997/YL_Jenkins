@@ -83,6 +83,8 @@ try {
     Assert-True (-not $workspaceFiles) 'The read-only CI Workspace contains no residual files.'
     $askpassFiles = docker compose exec --no-TTY build-agent sh -lc "find /tmp -maxdepth 1 -name 'jenkins-XHSMedium-CI-read-only-*-git-askpass' -type f -print 2>/dev/null || true"
     Assert-True (-not $askpassFiles) 'The temporary SCM AskPass wrapper was removed.'
+    $npmCachePaths = docker compose exec --no-TTY build-agent sh -lc "find /tmp -maxdepth 1 -name 'jenkins-XHSMedium-CI-read-only-*-npm-cache' -print 2>/dev/null || true"
+    Assert-True (-not $npmCachePaths) 'The isolated npm cache was removed.'
     Write-Host "P3A_EVIDENCE: build=$buildNumber sha=$resolvedSha duration_ms=$($build.duration)"
     $global:LASTEXITCODE = 0
 }

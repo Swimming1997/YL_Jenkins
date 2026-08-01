@@ -78,6 +78,8 @@ class SharedLibraryContractTest extends BasePipelineTest {
         assert selectedDirectory == 'backend'
         assert shellCall.script.contains('npm ci\nnpm test')
         assert shellCall.script.contains('ci-evidence/backend.log')
+        assert shellCall.script.contains('trap cleanup_node_modules EXIT')
+        assert shellCall.script.contains('rm -rf -- node_modules')
     }
 
     @Test

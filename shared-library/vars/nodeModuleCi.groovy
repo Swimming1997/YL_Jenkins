@@ -22,6 +22,8 @@ set -euo pipefail
 mkdir -p \"\$WORKSPACE/ci-evidence\"
 : > \"\$WORKSPACE/ci-evidence/${logName}\"
 exec > >(tee -a \"\$WORKSPACE/ci-evidence/${logName}\") 2>&1
+cleanup_node_modules() { rm -rf -- node_modules; }
+trap cleanup_node_modules EXIT
 ${commandBlock}
 """
         )

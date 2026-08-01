@@ -19,7 +19,7 @@ pipeline {
         GIT_TERMINAL_PROMPT = '0'
         npm_config_audit = 'false'
         npm_config_fund = 'false'
-        npm_config_cache = "${WORKSPACE}/.npm-cache"
+        npm_config_cache = "/tmp/${BUILD_TAG}-npm-cache"
     }
     options {
         skipDefaultCheckout(true)
@@ -143,6 +143,7 @@ pipeline {
     post {
         always {
             sh 'test -z "${SCM_ASKPASS_PATH:-}" || rm -f "$SCM_ASKPASS_PATH"'
+            sh 'case "$npm_config_cache" in /tmp/jenkins-XHSMedium-CI-read-only-*-npm-cache) rm -rf -- "$npm_config_cache" ;; *) echo "Unsafe npm cache path" >&2; false ;; esac'
             echo 'QUALITY_GAP: backend npm run lint is omitted because the repository command uses --fix.'
             archiveArtifacts artifacts: 'ci-evidence/**', allowEmptyArchive: true, fingerprint: true
             cleanupWorkspace()

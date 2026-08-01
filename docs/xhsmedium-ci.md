@@ -27,6 +27,8 @@ regression: npm ci → npm test
 
 所有 npm 依赖均安装在容器内的临时 Workspace。作业禁止并发，后一次手工触发会取消仍在运行的前一次构建；全局超时为 45 分钟。无论成功、失败或超时，证据归档后都会删除 Workspace。
 
+每个模块结束时立即删除该模块的 `node_modules`，避免多个依赖树同时占用 tmpfs/cgroup 内存。npm cache 使用 `/tmp/${BUILD_TAG}-npm-cache` 唯一路径并在 `post` 精确清理；测试 JSON 和模块日志保留到归档完成。
+
 Build Agent Workspace tmpfs 允许执行 Jenkins Git 包装及 `node_modules/.bin`，但仍保留 `nosuid`、`nodev`、`no-new-privileges`、能力裁剪和无 Docker/宿主机挂载边界。
 
 CI 在不提高 Build Agent 1 GiB 容器内存上限的情况下按模块限制 Node heap：backend 为 768 MiB，frontend 为 640 MiB，automation 和 regression 为 512 MiB。模块保持串行，避免 Node 与 Jenkins Agent JVM 共同触发 cgroup OOM。
