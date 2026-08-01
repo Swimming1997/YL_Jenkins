@@ -86,6 +86,8 @@ try {
         $computer = Invoke-RestMethod -Uri "http://$published/computer/(built-in)/api/json" -Headers $headers -TimeoutSec 15
         Assert-True ([int]$computer.numExecutors -eq 0) 'Running Controller executor count is zero.'
     }
+
+    $global:LASTEXITCODE = 0
 }
 finally {
     Pop-Location

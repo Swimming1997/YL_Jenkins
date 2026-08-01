@@ -43,10 +43,10 @@ if ($RunLibrarySmoke) {
     $jobUrl = "$BaseUrl/job/Platform/job/Validation/job/shared-library-smoke"
     $job = Invoke-RestMethod -Uri "$jobUrl/api/json" -Headers $adminHeaders -TimeoutSec 20
     $expectedBuild = [int]$job.nextBuildNumber
-    $crumb = Invoke-RestMethod -Uri "$BaseUrl/crumbIssuer/api/json" -Headers $adminHeaders -TimeoutSec 20
+    $crumb = Invoke-RestMethod -Uri "$BaseUrl/crumbIssuer/api/json" -Headers $adminHeaders -SessionVariable jenkinsSession -TimeoutSec 20
     $buildHeaders = @{} + $adminHeaders
     $buildHeaders[$crumb.crumbRequestField] = $crumb.crumb
-    $response = Invoke-WebRequest -UseBasicParsing -SkipHttpErrorCheck -Method Post -Uri "$jobUrl/build" -Headers $buildHeaders -TimeoutSec 20
+    $response = Invoke-WebRequest -UseBasicParsing -SkipHttpErrorCheck -Method Post -ContentType 'application/x-www-form-urlencoded' -Uri "$jobUrl/build" -Headers $buildHeaders -WebSession $jenkinsSession -TimeoutSec 20
     if ([int]$response.StatusCode -notin @(200, 201, 202)) { throw "Could not trigger Shared Library smoke build: HTTP $($response.StatusCode)." }
 
     $deadline = (Get-Date).AddMinutes(3)
@@ -66,4 +66,3 @@ if ($RunLibrarySmoke) {
     if ($console.Content -notmatch 'SCM_LIBRARY_OK') { throw 'Shared Library smoke marker was not found in the build log.' }
     Write-Host "PASS: SCM Shared Library loaded from GitHub in build $expectedBuild."
 }
-
