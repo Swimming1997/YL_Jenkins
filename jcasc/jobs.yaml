@@ -1,0 +1,19 @@
+jobs:
+  - file: /var/jenkins_home/job-dsl/folders.groovy
+  - file: /var/jenkins_home/job-dsl/seed.groovy
+
+unclassified:
+  globalLibraries:
+    libraries:
+      - name: "jenkins-platform-library"
+        defaultVersion: "main"
+        implicit: false
+        allowVersionOverride: false
+        includeInChangesets: true
+        retriever:
+          modernSCM:
+            libraryPath: "shared-library"
+            scm:
+              git:
+                id: "jenkins-platform-library"
+                remote: "${JENKINS_LIBRARY_URL}"

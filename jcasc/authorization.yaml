@@ -1,0 +1,59 @@
+jenkins:
+  authorizationStrategy:
+    roleBased:
+      roles:
+        global:
+          - name: "administrator"
+            description: "Full Jenkins platform administration"
+            permissions:
+              - "Overall/Administer"
+            entries:
+              - user: "admin"
+          - name: "authenticated-readonly"
+            description: "Authenticated users can view platform and jobs"
+            permissions:
+              - "Overall/Read"
+              - "Job/Read"
+              - "View/Read"
+            entries:
+              - group: "authenticated"
+        items:
+          - name: "developers"
+            description: "Build and cancel XHSMedium CI jobs"
+            pattern: "^XHSMedium/CI(?:/.*)?$"
+            permissions:
+              - "Job/Read"
+              - "Job/Build"
+              - "Job/Cancel"
+              - "Job/Workspace"
+            entries:
+              - group: "developers"
+          - name: "test-leads"
+            description: "Operate XHSMedium CI and regression jobs"
+            pattern: "^XHSMedium/(?:CI|Regression)(?:/.*)?$"
+            permissions:
+              - "Job/Read"
+              - "Job/Build"
+              - "Job/Cancel"
+              - "Job/Workspace"
+            entries:
+              - group: "test-leads"
+          - name: "release-managers"
+            description: "Operate XHSMedium release jobs"
+            pattern: "^XHSMedium/Release(?:/.*)?$"
+            permissions:
+              - "Job/Read"
+              - "Job/Build"
+              - "Job/Cancel"
+            entries:
+              - group: "release-managers"
+          - name: "operations"
+            description: "Operate XHSMedium deployment and operations jobs"
+            pattern: "^XHSMedium/(?:Deploy|Operations)(?:/.*)?$"
+            permissions:
+              - "Job/Read"
+              - "Job/Build"
+              - "Job/Cancel"
+            entries:
+              - group: "operations"
+

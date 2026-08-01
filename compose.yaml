@@ -1,0 +1,47 @@
+name: ${COMPOSE_PROJECT_NAME:-jenkins-platform}
+
+services:
+  controller:
+    build:
+      context: .
+      dockerfile: controller/Dockerfile
+      args:
+        JENKINS_IMAGE: ${JENKINS_IMAGE:-jenkins/jenkins:2.568.1-jdk21@sha256:f4f65e6cd1405cd889b7f5ac33f9d5cdc2a099de6b87fe8a3933b9c5d53d1d02}
+    image: jenkins-platform/controller:2.568.1
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${JENKINS_HTTP_PORT:-8080}:8080"
+    environment:
+      CASC_JENKINS_CONFIG: /var/jenkins_home/casc_configs
+      JENKINS_PUBLIC_URL: ${JENKINS_URL:-http://127.0.0.1:8080/}
+      JENKINS_LIBRARY_URL: ${JENKINS_LIBRARY_URL:-https://github.com/Swimming1997/YL_Jenkins.git}
+      JAVA_OPTS: >-
+        -Djenkins.install.runSetupWizard=false
+        -Djava.awt.headless=true
+        -Dio.jenkins.plugins.casc.core.HudsonPrivateSecurityRealmConfigurator.exportUsers=false
+        -Dcom.michelin.cio.hudson.plugins.rolestrategy.RoleBasedAuthorizationStrategy.useItemAndAgentRoles=true
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - ./jcasc:/var/jenkins_home/casc_configs:ro
+      - ./jobs:/var/jenkins_home/job-dsl:ro
+    secrets:
+      - jenkins_admin_password
+      - jenkins_audit_password
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --silent --show-error http://127.0.0.1:8080/login >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  jenkins_home:
+    name: ${JENKINS_VOLUME_NAME:-jenkins_platform_home}
+
+secrets:
+  jenkins_admin_password:
+    file: ./.secrets/jenkins_admin_password
+  jenkins_audit_password:
+    file: ./.secrets/jenkins_audit_password

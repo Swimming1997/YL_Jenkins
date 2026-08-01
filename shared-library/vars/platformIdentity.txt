@@ -1,0 +1,4 @@
+Returns the stable identity of the Jenkins platform Shared Library.
+
+This step is intentionally side-effect free and is used by the P1 SCM loading smoke test.
+

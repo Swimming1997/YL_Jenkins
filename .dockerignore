@@ -1,0 +1,9 @@
+.git
+.env
+.secrets
+*.log
+artifacts
+backups
+docs
+scripts
+README.md

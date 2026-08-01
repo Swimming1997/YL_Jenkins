@@ -1,0 +1,9 @@
+.env
+.secrets/
+*.log
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+artifacts/
+backups/

@@ -1,0 +1,14 @@
+jenkins:
+  systemMessage: |-
+    Jenkins Platform
+    Managed by Jenkins Configuration as Code. Manual configuration may be overwritten.
+  numExecutors: 0
+  mode: EXCLUSIVE
+  scmCheckoutRetryCount: 2
+  slaveAgentPort: -1
+  disableRememberMe: true
+
+unclassified:
+  location:
+    adminAddress: "jenkins-admin@localhost.invalid"
+    url: "${JENKINS_PUBLIC_URL}"
