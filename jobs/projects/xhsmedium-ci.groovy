@@ -41,6 +41,7 @@ pipeline {
                             usernameVariable: 'SCM_USER',
                             passwordVariable: 'SCM_TOKEN'
                         )]) {
+                            env.SCM_ASKPASS_PATH = "/tmp/${env.BUILD_TAG}-git-askpass"
                             writeFile(
                                 file: '.git-askpass.sh',
                                 text: '#!/bin/sh\\ncase "$1" in\\n  *Username*) printf "%s\\\\n" "$SCM_USER" ;;\\n  *Password*) printf "%s\\\\n" "$SCM_TOKEN" ;;\\n  *) exit 1 ;;\\nesac\\n'
@@ -48,10 +49,10 @@ pipeline {
                             try {
                                 env.RESOLVED_SHA = sh(
                                     returnStdout: true,
-                                    script: 'set +x; chmod 700 .git-askpass.sh; GIT_ASKPASS="$WORKSPACE/.git-askpass.sh" GIT_ASKPASS_REQUIRE=force git ls-remote --exit-code --heads "$XHSMEDIUM_REPOSITORY" "refs/heads/$CI_BRANCH" | cut -f1'
+                                    script: 'set +x; install -m 700 .git-askpass.sh "$SCM_ASKPASS_PATH"; GIT_ASKPASS="$SCM_ASKPASS_PATH" GIT_ASKPASS_REQUIRE=force git ls-remote --exit-code --heads "$XHSMEDIUM_REPOSITORY" "refs/heads/$CI_BRANCH" | cut -f1'
                                 ).trim()
                             } finally {
-                                sh 'rm -f .git-askpass.sh'
+                                sh 'rm -f .git-askpass.sh "$SCM_ASKPASS_PATH"'
                             }
                         }
                     }
@@ -137,6 +138,7 @@ pipeline {
     }
     post {
         always {
+            sh 'test -z "${SCM_ASKPASS_PATH:-}" || rm -f "$SCM_ASKPASS_PATH"'
             echo 'QUALITY_GAP: backend npm run lint is omitted because the repository command uses --fix.'
             archiveArtifacts artifacts: 'ci-evidence/**', allowEmptyArchive: true, fingerprint: true
             cleanupWorkspace()

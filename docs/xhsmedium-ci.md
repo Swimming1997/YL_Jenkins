@@ -10,7 +10,7 @@
 - Jenkins 凭据 `xhsmedium-scm-readonly` 读取 `.secrets/xhsmedium_scm_token` 对应的 Docker Secret。Token 必须只授权该仓库的 `Contents: Read-only`。
 - 未指定 SHA 时，作业先通过 `git ls-remote` 将分支解析为 SHA，再按该 SHA Checkout。构建日志和 `ci-evidence/build-metadata.txt` 都记录最终身份。
 
-解析阶段通过无密钥的临时 `GIT_ASKPASS` 脚本读取 Jenkins 注入的环境变量；脚本随即删除并退出凭据作用域。项目源码和 npm 命令不会获得 Token，日志及归档也不得包含 Token。
+解析阶段通过 `/tmp` 中按 Jenkins `BUILD_TAG` 唯一命名、脚本内容不含密钥的临时 `GIT_ASKPASS` 包装读取 Jenkins 注入的环境变量；包装在 `finally` 和 `post` 中清理，随后退出凭据作用域。项目源码和 npm 命令不会获得 Token，日志及归档也不得包含 Token。
 
 这是手工试点作业。P3A 不配置 Webhook、Multibranch Pipeline 或 GitHub 状态回写。
 

@@ -81,6 +81,8 @@ try {
 
     $workspaceFiles = docker compose exec --no-TTY build-agent sh -lc "find /home/jenkins/agent/workspace -path '*XHSMedium_CI_read-only*' -type f -print 2>/dev/null || true"
     Assert-True (-not $workspaceFiles) 'The read-only CI Workspace contains no residual files.'
+    $askpassFiles = docker compose exec --no-TTY build-agent sh -lc "find /tmp -maxdepth 1 -name 'jenkins-XHSMedium-CI-read-only-*-git-askpass' -type f -print 2>/dev/null || true"
+    Assert-True (-not $askpassFiles) 'The temporary SCM AskPass wrapper was removed.'
     Write-Host "P3A_EVIDENCE: build=$buildNumber sha=$resolvedSha duration_ms=$($build.duration)"
     $global:LASTEXITCODE = 0
 }
