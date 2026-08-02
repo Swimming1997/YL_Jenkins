@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
-    [string]$BaseUrl = 'http://127.0.0.1:8080'
+    [string]$BaseUrl = 'http://127.0.0.1:8080',
+    [switch]$TestChangeTrigger
 )
 
 $ErrorActionPreference = 'Stop'
@@ -24,6 +25,7 @@ $watcherUrl = "$BaseUrl/job/XHSMedium/job/CI/job/watch-dev"
 $ciUrl = "$BaseUrl/job/XHSMedium/job/CI/job/read-only"
 
 function Invoke-WatcherBuild {
+    param([string]$ExpectedMarker = 'SCM_NO_CHANGE')
     $job = Invoke-RestMethod "$watcherUrl/api/json?tree=nextBuildNumber" -Headers $headers -TimeoutSec 20
     $number = [int]$job.nextBuildNumber
     $response = Invoke-WebRequest -UseBasicParsing -SkipHttpErrorCheck -Method Post -Uri "$watcherUrl/build" -Headers $postHeaders -WebSession $session -TimeoutSec 20
@@ -40,7 +42,7 @@ function Invoke-WatcherBuild {
     } while ((Get-Date) -lt $deadline)
     Assert-True ($null -ne $build -and -not $build.building -and $build.result -eq 'SUCCESS') "Watcher build $number completed successfully."
     $console = (Invoke-WebRequest -UseBasicParsing "$watcherUrl/$number/consoleText" -Headers $headers -TimeoutSec 20).Content
-    Assert-True ($console -match 'SCM_NO_CHANGE sha=[0-9a-f]{40}') "Watcher build $number detected no SHA change."
+    Assert-True ($console -match "$ExpectedMarker.*[0-9a-f]{40}") "Watcher build $number emitted $ExpectedMarker."
     return $number
 }
 
@@ -54,11 +56,35 @@ try {
     $after = [int](Invoke-RestMethod "$ciUrl/api/json?tree=nextBuildNumber" -Headers $headers -TimeoutSec 20).nextBuildNumber
     Assert-True ($before -eq $after) 'Unchanged dev SHA did not trigger a full CI build.'
 
+    $triggeredBuild = 0
+    if ($TestChangeTrigger) {
+        $secondState = Invoke-RestMethod "$watcherUrl/$second/api/json?tree=description" -Headers $headers -TimeoutSec 20
+        $originalDescription = $secondState.description
+        Assert-True ($originalDescription -match '^SHA=[0-9a-f]{40}$') 'Watcher state contains a restorable observed SHA.'
+        try {
+            $syntheticOldSha = '0000000000000000000000000000000000000000'
+            $update = Invoke-WebRequest -UseBasicParsing -SkipHttpErrorCheck -Method Post -ContentType 'application/x-www-form-urlencoded' `
+                -Uri "$watcherUrl/$second/submitDescription" -Headers $postHeaders -WebSession $session `
+                -Body @{ description = "SHA=$syntheticOldSha" } -TimeoutSec 20
+            Assert-True ([int]$update.StatusCode -in @(200, 201, 302)) 'Synthetic previous SHA was installed for isolated trigger validation.'
+            $triggeredBuild = [int](Invoke-RestMethod "$ciUrl/api/json?tree=nextBuildNumber" -Headers $headers -TimeoutSec 20).nextBuildNumber
+            $third = Invoke-WatcherBuild -ExpectedMarker 'SCM_CHANGE_TRIGGERED'
+            $nextAfterTrigger = [int](Invoke-RestMethod "$ciUrl/api/json?tree=nextBuildNumber" -Headers $headers -TimeoutSec 20).nextBuildNumber
+            Assert-True ($nextAfterTrigger -eq ($triggeredBuild + 1)) "Changed SHA triggered full CI build $triggeredBuild exactly once."
+        }
+        finally {
+            $restore = Invoke-WebRequest -UseBasicParsing -SkipHttpErrorCheck -Method Post -ContentType 'application/x-www-form-urlencoded' `
+                -Uri "$watcherUrl/$second/submitDescription" -Headers $postHeaders -WebSession $session `
+                -Body @{ description = $originalDescription } -TimeoutSec 20
+            Assert-True ([int]$restore.StatusCode -in @(200, 201, 302)) 'Synthetic watcher history was restored.'
+        }
+    }
+
     $workspaceFiles = docker compose exec --no-TTY build-agent sh -lc "find /home/jenkins/agent/workspace -path '*XHSMedium_CI_watch-dev*' -type f -print 2>/dev/null || true"
     Assert-True (-not $workspaceFiles) 'Watcher Workspace contains no residual files.'
     $askpassFiles = docker compose exec --no-TTY build-agent sh -lc "find /tmp -maxdepth 1 -name 'jenkins-XHSMedium-CI-watch-dev-*-watch-git-askpass' -type f -print 2>/dev/null || true"
     Assert-True (-not $askpassFiles) 'Watcher AskPass wrappers were removed.'
-    Write-Host "P3B_WATCHER_EVIDENCE: builds=$first,$second downstream_next=$after"
+    Write-Host "P3B_WATCHER_EVIDENCE: unchanged_builds=$first,$second triggered_ci=$triggeredBuild downstream_next=$after"
     $global:LASTEXITCODE = 0
 }
 finally {

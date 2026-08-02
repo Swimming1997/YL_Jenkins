@@ -18,6 +18,7 @@
 
 ```powershell
 .\scripts\test-xhsmedium-watcher.ps1
+.\scripts\test-xhsmedium-watcher.ps1 -TestChangeTrigger
 ```
 
-脚本连续运行两次 watcher，在远端 SHA 未变化时证明不会增加完整 CI 的 next build number，并检查 Workspace 与 AskPass 清理。
+默认脚本连续运行两次 watcher，在远端 SHA 未变化时证明不会增加完整 CI 的 next build number。`-TestChangeTrigger` 会临时把上一条 watcher build description 改为合成旧 SHA，证明下一次 watcher 恰好触发一次完整 CI，然后恢复历史描述；它不修改 GitHub 仓库。两种模式都检查 Workspace 与 AskPass 清理。
