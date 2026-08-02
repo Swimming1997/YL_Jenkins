@@ -55,6 +55,7 @@ Get-Content .\.secrets\jenkins_admin_password
 .\scripts\test-shared-library.ps1
 .\scripts\test-agents.ps1
 .\scripts\test-xhsmedium-ci.ps1 -Branch dev
+.\scripts\test-xhsmedium-watcher.ps1
 ```
 
 验证数据卷在容器重建后仍然保留数据：
@@ -115,3 +116,4 @@ docker compose down
 - `docs/agents.md`：Agent 标签、连接和验证
 - `docs/docker-isolation.md`：专用 DIND 与清理边界
 - `docs/xhsmedium-ci.md`：XHSMedium 手工只读 CI、证据和安全边界
+- `docs/xhsmedium-scm-polling.md`：每小时检查 dev 拉新并按新 SHA 触发 CI

@@ -151,6 +151,94 @@ pipeline {
         }
     }
 }
+
+pipelineJob('XHSMedium/CI/watch-dev') {
+    description('Checks the private XHSMedium dev branch once per hour and triggers read-only CI exactly once for each newly observed SHA.')
+    definition {
+        cps {
+            sandbox(true)
+            script('''
+@Library('jenkins-platform-library') _
+
+pipeline {
+    agent { label 'xhsmedium-build' }
+    environment {
+        XHSMEDIUM_REPOSITORY = 'https://github.com/MuFannnn/xhsmedium.git'
+        WATCH_BRANCH = 'dev'
+        INITIAL_BASELINE_SHA = '1ac17fb695a8099fe01e0cd9311b6f272c23a491'
+        GIT_TERMINAL_PROMPT = '0'
+    }
+    triggers { cron('H * * * *') }
+    options {
+        skipDefaultCheckout(true)
+        disableConcurrentBuilds()
+        timeout(time: 3, unit: 'MINUTES')
+        buildDiscarder(logRotator(numToKeepStr: '30'))
+    }
+    stages {
+        stage('Check dev SHA') {
+            steps {
+                script {
+                    withCredentials([usernamePassword(
+                        credentialsId: 'xhsmedium-scm-readonly',
+                        usernameVariable: 'SCM_USER',
+                        passwordVariable: 'SCM_TOKEN'
+                    )]) {
+                        env.SCM_ASKPASS_PATH = "/tmp/${env.BUILD_TAG}-watch-git-askpass"
+                        writeFile(
+                            file: '.git-askpass.sh',
+                            text: '#!/bin/sh\\ncase "$1" in\\n  *Username*) printf "%s\\\\n" "$SCM_USER" ;;\\n  *Password*) printf "%s\\\\n" "$SCM_TOKEN" ;;\\n  *) exit 1 ;;\\nesac\\n'
+                        )
+                        try {
+                            env.REMOTE_SHA = sh(
+                                returnStdout: true,
+                                script: 'set +x; install -m 700 .git-askpass.sh "$SCM_ASKPASS_PATH"; GIT_ASKPASS="$SCM_ASKPASS_PATH" GIT_ASKPASS_REQUIRE=force git ls-remote --exit-code --heads "$XHSMEDIUM_REPOSITORY" "refs/heads/$WATCH_BRANCH" | cut -f1'
+                            ).trim()
+                        } finally {
+                            sh 'rm -f .git-askpass.sh "$SCM_ASKPASS_PATH"'
+                        }
+                    }
+
+                    env.REMOTE_SHA = validateGitRef(branch: env.WATCH_BRANCH, sha: env.REMOTE_SHA).sha
+                    def decision = scmChangeDecision(
+                        remoteSha: env.REMOTE_SHA,
+                        baselineSha: env.INITIAL_BASELINE_SHA,
+                        previousDescription: currentBuild.previousBuild?.description
+                    )
+                    if (!decision.changed) {
+                        currentBuild.description = "SHA=${decision.remoteSha}"
+                        echo "SCM_NO_CHANGE sha=${decision.remoteSha} source=${decision.source}"
+                        return
+                    }
+
+                    build(
+                        job: '/XHSMedium/CI/read-only',
+                        parameters: [
+                            string(name: 'BRANCH', value: env.WATCH_BRANCH),
+                            string(name: 'GIT_SHA', value: decision.remoteSha)
+                        ],
+                        wait: false,
+                        quietPeriod: 0
+                    )
+                    currentBuild.description = "SHA=${decision.remoteSha}"
+                    echo "SCM_CHANGE_TRIGGERED previous=${decision.lastSeenSha} current=${decision.remoteSha}"
+                }
+            }
+        }
+    }
+    post {
+        always {
+            sh 'test -z "${SCM_ASKPASS_PATH:-}" || rm -f "$SCM_ASKPASS_PATH"'
+            cleanupWorkspace()
+        }
+    }
+}
+'''.stripIndent())
+        }
+    }
+    logRotator { numToKeep(30) }
+    disabled(false)
+}
 '''.stripIndent())
         }
     }

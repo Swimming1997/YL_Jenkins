@@ -43,7 +43,7 @@ try {
         Assert-True ($pluginNames -contains $required) "Required plugin '$required' is locked."
     }
 
-    foreach ($configFile in @('jcasc\jenkins.yaml', 'jcasc\security.yaml', 'jcasc\authorization.yaml', 'jcasc\jobs.yaml', 'jcasc\agents.yaml', 'jcasc\credentials.yaml', 'jobs\folders.groovy', 'jobs\seed.groovy', 'jobs\projects\xhsmedium-ci.groovy', 'shared-library\vars\validateGitRef.groovy', 'shared-library\vars\nodeModuleCi.groovy', 'shared-library\vars\recordBuildMetadata.groovy', 'agents\build\Dockerfile', 'agents\regression\Dockerfile')) {
+    foreach ($configFile in @('jcasc\jenkins.yaml', 'jcasc\security.yaml', 'jcasc\authorization.yaml', 'jcasc\jobs.yaml', 'jcasc\agents.yaml', 'jcasc\credentials.yaml', 'jobs\folders.groovy', 'jobs\seed.groovy', 'jobs\projects\xhsmedium-ci.groovy', 'shared-library\vars\validateGitRef.groovy', 'shared-library\vars\nodeModuleCi.groovy', 'shared-library\vars\recordBuildMetadata.groovy', 'shared-library\vars\scmChangeDecision.groovy', 'scripts\test-xhsmedium-watcher.ps1', 'agents\build\Dockerfile', 'agents\regression\Dockerfile')) {
         Assert-True (Test-Path -LiteralPath $configFile) "Configuration file '$configFile' exists."
     }
 
@@ -78,6 +78,11 @@ try {
     Assert-True ($xhsmediumCi -notmatch 'https://[^\s"'']*\$SCM_(?:USER|TOKEN)') 'XHSMedium CI never embeds SCM credentials in a URL.'
     Assert-True ($xhsmediumCi -match 'git diff --exit-code -- \.') 'XHSMedium CI checks that tracked source files remain unchanged.'
     Assert-True ($xhsmediumCi -notmatch '(?i)docker\s+(?:build|compose|run)|ftp://|feishu|aliyun|ossutil') 'XHSMedium CI contains no Docker, FTP, Feishu, or OSS operation.'
+    Assert-True ($xhsmediumCi -match "pipelineJob\('XHSMedium/CI/watch-dev'\)") 'XHSMedium dev watcher has the expected fixed path.'
+    Assert-True ($xhsmediumCi -match "triggers \{ cron\('H \* \* \* \*'\) \}") 'XHSMedium dev watcher checks once per hour.'
+    Assert-True ($xhsmediumCi -match "WATCH_BRANCH = 'dev'" -and $xhsmediumCi -match "INITIAL_BASELINE_SHA = '1ac17fb695a8099fe01e0cd9311b6f272c23a491'") 'XHSMedium watcher uses the confirmed dev branch and P3A baseline.'
+    Assert-True ($xhsmediumCi -match "job: '/XHSMedium/CI/read-only'" -and $xhsmediumCi -match 'wait: false') 'XHSMedium watcher asynchronously triggers the fixed read-only CI job.'
+    Assert-True ($xhsmediumCi -match 'SCM_NO_CHANGE' -and $xhsmediumCi -match 'SCM_CHANGE_TRIGGERED') 'XHSMedium watcher reports unchanged and changed decisions explicitly.'
 
     $composeText = Get-Content -Raw -LiteralPath 'compose.yaml'
     $controllerCompose = [regex]::Match($composeText, '(?ms)^  controller:.*?(?=^  build-agent:)').Value

@@ -102,4 +102,27 @@ class SharedLibraryContractTest extends BasePipelineTest {
         assert written.text.contains('release_eligible=false')
         assert written.text.contains('backend_lint=omitted_mutating_command')
     }
+
+    @Test
+    void scmPollingUsesValidatedBaselineOnFirstRun() {
+        def script = loadScript('vars/scmChangeDecision.groovy')
+        String sha = '1111111111111111111111111111111111111111'
+
+        assert script.call(remoteSha: sha, baselineSha: sha, previousDescription: '').changed == false
+        assert script.call(remoteSha: '2222222222222222222222222222222222222222', baselineSha: sha, previousDescription: '').changed == true
+    }
+
+    @Test
+    void scmPollingUsesPreviousObservedShaAfterFirstRun() {
+        def script = loadScript('vars/scmChangeDecision.groovy')
+        String baseline = '1111111111111111111111111111111111111111'
+        String observed = '2222222222222222222222222222222222222222'
+
+        def unchanged = script.call(remoteSha: observed, baselineSha: baseline, previousDescription: "SHA=${observed}")
+        def changed = script.call(remoteSha: '3333333333333333333333333333333333333333', baselineSha: baseline, previousDescription: "SHA=${observed}")
+
+        assert unchanged == [changed: false, remoteSha: observed, lastSeenSha: observed, source: 'previous-build']
+        assert changed.changed == true
+        assert changed.lastSeenSha == observed
+    }
 }
