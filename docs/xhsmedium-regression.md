@@ -27,9 +27,28 @@ XHSMedium Dockerfile 的 `dependencies` target 先在宿主机 Docker 中按固�
 
 Jenkins 运行时要求缓存标签与待测 SHA 完全一致。包装层只接受预期 Compose project，并对 runner、backend、frontend 注入 `NPM_OFFLINE=true`和对应缓存镜像。缓存缺失、角色错误或 SHA 不匹配都会在启动测试数据库前失败。
 
+runner 镜像内的三个 `node_modules`会被 Compose 命名卷覆盖。每个 project 首次启动 runner 时，平台入口脚本先确认 backend、frontend、automation 三个路径都是独立 mountpoint，只初始化这些卷的属主，然后使用 `setpriv`降权到 Regression Agent 的动态 UID/GID 再执行 sealed plan 原命令。入口脚本不以 root 身份运行项目测试，也不修改 fixed-SHA worktree。
+
 XHSMedium 的初始化脚本会被 MySQL 官方 entrypoint `source`，其中的 `set -u`会继续影响官方脚本。平台从 fixed-SHA 仓库外附加一个极薄 wrapper，由它在独立 Bash 子进程执行原始初始化脚本；这样保留原始数据库名校验、schema 和 seed，同时避免 Shell option 泄漏。平台不修改 fixed-SHA Workspace、数据库结构或种子数据。
 
 依赖锁文件或待测 SHA 更新后必须先重新执行预加载。预加载只使用宿主机 Docker 客户端，不向 Agent 挂载 Docker Socket；临时源码快照和 tar 无论成功失败都会删除。
+
+## 失败与精确清理
+
+automation 自身的 `clean`完成后，Jenkins post 仍会对固定 Compose project 执行 `down --volumes --remove-orphans`。人工中断可能与 `docker compose run --rm`创建 one-off 容器并发，因此平台还会按精确 `com.docker.compose.project`标签重试移除该 project 的容器、卷和网络；连续三次观察为空才输出 `P4_EXACT_PROJECT_CLEANUP_OK`。辅助脚本只接受 `xhsmedium-test-scheduled-*`，禁止全局 prune，未收敛时让 post 失败。
+
+可重复验收命令：
+
+```powershell
+.\scripts\test-xhsmedium-regression-resilience.ps1 `
+  -FailureBuildNumber 9 `
+  -TimeoutBuildNumber 10 `
+  -InterruptionBuildNumber 12
+```
+
+当前证据：构建 9 正确记录业务测试失败且 cleanup succeeded；构建 10 因验证超时为 `ABORTED`；构建 12 由管理员中断为 `ABORTED`，并在出现 one-off 创建竞态后由精确 helper 收敛到零残留。三者均未输出成功 marker，Workspace、npm cache 和兼容脚本也已清零。
+
+P4 仍处于进行中。固定 SHA `208d36fb42dda939184cbec2f1f829c8480c4d5f`的构建 9 中，除 `leads-cross-role`外所有阶段均通过；剩余首个失败是同一测试文件连续两次 `POST /leads`触发应用一秒防抖而返回 429。需要 XHSMedium 新 SHA 修复测试节奏后，重新预加载并取得真实 PASSED 与 TimerTriggerCause 证据。
 
 ## 安全边界
 
