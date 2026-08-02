@@ -2,6 +2,7 @@ jobs:
   - file: /var/jenkins_home/job-dsl/folders.groovy
   - file: /var/jenkins_home/job-dsl/seed.groovy
   - file: /var/jenkins_home/job-dsl/projects/xhsmedium-ci.groovy
+  - file: /var/jenkins_home/job-dsl/projects/xhsmedium-regression.groovy
 
 unclassified:
   globalLibraries:

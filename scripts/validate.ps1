@@ -43,7 +43,7 @@ try {
         Assert-True ($pluginNames -contains $required) "Required plugin '$required' is locked."
     }
 
-    foreach ($configFile in @('jcasc\jenkins.yaml', 'jcasc\security.yaml', 'jcasc\authorization.yaml', 'jcasc\jobs.yaml', 'jcasc\agents.yaml', 'jcasc\credentials.yaml', 'jobs\folders.groovy', 'jobs\seed.groovy', 'jobs\projects\xhsmedium-ci.groovy', 'shared-library\vars\validateGitRef.groovy', 'shared-library\vars\nodeModuleCi.groovy', 'shared-library\vars\recordBuildMetadata.groovy', 'shared-library\vars\scmChangeDecision.groovy', 'scripts\test-xhsmedium-watcher.ps1', 'agents\build\Dockerfile', 'agents\regression\Dockerfile')) {
+    foreach ($configFile in @('jcasc\jenkins.yaml', 'jcasc\security.yaml', 'jcasc\authorization.yaml', 'jcasc\jobs.yaml', 'jcasc\agents.yaml', 'jcasc\credentials.yaml', 'jobs\folders.groovy', 'jobs\seed.groovy', 'jobs\projects\xhsmedium-ci.groovy', 'jobs\projects\xhsmedium-regression.groovy', 'shared-library\vars\validateGitRef.groovy', 'shared-library\vars\nodeModuleCi.groovy', 'shared-library\vars\recordBuildMetadata.groovy', 'shared-library\vars\scmChangeDecision.groovy', 'shared-library\resources\xhsmedium\docker-offline-wrapper.sh', 'scripts\preload-xhsmedium-regression.ps1', 'scripts\test-xhsmedium-regression.ps1', 'scripts\test-xhsmedium-watcher.ps1', 'agents\build\Dockerfile', 'agents\regression\Dockerfile')) {
         Assert-True (Test-Path -LiteralPath $configFile) "Configuration file '$configFile' exists."
     }
 
@@ -63,6 +63,7 @@ try {
     Assert-True ($libraryConfig -match 'https://github.com/Swimming1997/YL_Jenkins.git|\$\{JENKINS_LIBRARY_URL\}') 'SCM Shared Library URL is configured.'
     Assert-True ($libraryConfig -match 'libraryPath:\s*"shared-library"') 'SCM Shared Library path is configured.'
     Assert-True ($libraryConfig -match 'job-dsl/projects/xhsmedium-ci\.groovy') 'XHSMedium read-only CI Job DSL is loaded by JCasC.'
+    Assert-True ($libraryConfig -match 'job-dsl/projects/xhsmedium-regression\.groovy') 'XHSMedium scheduled regression Job DSL is loaded by JCasC.'
 
     $xhsmediumCi = Get-Content -Raw -LiteralPath 'jobs\projects\xhsmedium-ci.groovy'
     Assert-True (([regex]::Matches($xhsmediumCi, "script\('''")).Count -eq 2 -and ([regex]::Matches($xhsmediumCi, "'''\.stripIndent\(\)")).Count -eq 2) 'Each XHSMedium Job DSL Pipeline script has an independent balanced boundary.'
@@ -84,6 +85,26 @@ try {
     Assert-True ($xhsmediumCi -match "WATCH_BRANCH = 'dev'" -and $xhsmediumCi -match "INITIAL_BASELINE_SHA = '1ac17fb695a8099fe01e0cd9311b6f272c23a491'") 'XHSMedium watcher uses the confirmed dev branch and P3A baseline.'
     Assert-True ($xhsmediumCi -match "job: '/XHSMedium/CI/read-only'" -and $xhsmediumCi -match 'wait: false') 'XHSMedium watcher asynchronously triggers the fixed read-only CI job.'
     Assert-True ($xhsmediumCi -match 'SCM_NO_CHANGE' -and $xhsmediumCi -match 'SCM_CHANGE_TRIGGERED') 'XHSMedium watcher reports unchanged and changed decisions explicitly.'
+
+    $xhsmediumRegression = Get-Content -Raw -LiteralPath 'jobs\projects\xhsmedium-regression.groovy'
+    Assert-True (([regex]::Matches($xhsmediumRegression, "script\('''")).Count -eq 1 -and ([regex]::Matches($xhsmediumRegression, "'''\.stripIndent\(\)")).Count -eq 1 -and ([regex]::Matches($xhsmediumRegression, "'''")).Count -eq 2) 'XHSMedium regression Pipeline script has one isolated balanced boundary.'
+    Assert-True ($xhsmediumRegression -match "pipelineJob\('XHSMedium/Regression/scheduled'\)") 'XHSMedium scheduled regression job has the expected fixed path.'
+    Assert-True ($xhsmediumRegression -match "agent \{ label 'xhsmedium-regression' \}") 'XHSMedium regression is restricted to the Regression Agent.'
+    Assert-True ($xhsmediumRegression -match "triggers \{ cron\('0 \*/2 \* \* \*'\) \}") 'XHSMedium regression runs at each even-hour slot.'
+    Assert-True ($xhsmediumRegression -match 'disableConcurrentBuilds\(abortPrevious: false\)') 'XHSMedium regression does not overlap scheduled runs.'
+    Assert-True ($xhsmediumRegression -match 'libraryResource\(''xhsmedium/docker-offline-wrapper\.sh''\)') 'XHSMedium regression installs the reviewed offline Docker wrapper.'
+    Assert-True ($xhsmediumRegression -match 'down --volumes --remove-orphans') 'XHSMedium regression performs exact Compose cleanup.'
+    Assert-True ($xhsmediumRegression -notmatch '(?i)ftp://|feishu|aliyun|ossutil|/var/run/docker\.sock') 'XHSMedium regression contains no external delivery or host Docker Socket operation.'
+
+    $offlineWrapper = Get-Content -Raw -LiteralPath 'shared-library\resources\xhsmedium\docker-offline-wrapper.sh'
+    Assert-True ($offlineWrapper -match 'xhsmedium\.preload\.sha' -and $offlineWrapper -match 'xhsmedium\.preload\.role') 'Offline Docker wrapper verifies full SHA and role labels.'
+    Assert-True ($offlineWrapper -match 'OFFLINE_DEPENDENCY_CACHE' -and $offlineWrapper -match 'NPM_OFFLINE=true') 'Offline Docker wrapper reports and enforces cache use.'
+    Assert-True ($offlineWrapper -notmatch '/var/run/docker\.sock') 'Offline Docker wrapper never references the host Docker Socket.'
+
+    $preloadScript = Get-Content -Raw -LiteralPath 'scripts\preload-xhsmedium-regression.ps1'
+    Assert-True ($preloadScript -match "'--target', 'dependencies'" -and $preloadScript -match 'xhsmedium\.preload\.sha') 'Regression preloader builds labeled dependency stages.'
+    Assert-True ($preloadScript -match "'save'" -and $preloadScript -match "'load'") 'Regression preloader transfers images into isolated DIND.'
+    Assert-True (($preloadScript -match 'sha256:8dbcf531a03aade657e181b9cf2f1d1803ce621a1d55610cb44cb531ab7d7db6') -and ($preloadScript -match 'sha256:2cf067cfed83d5ea958367df9f966191a942351a2df77d6f0193e162b5febfc0') -and ($preloadScript -match 'sha256:b0ab6f3cb99aa7803adbc14d9027ec1785fc6e433b97e134e0f8fe61683b6b53') -and ($preloadScript -match 'sha256:9bd26ad900bb5e0f4dee75839e957a89ae89c2b7ab1e76050e559790e946b948')) 'Regression preloader verifies pinned input image identities.'
 
     $composeText = Get-Content -Raw -LiteralPath 'compose.yaml'
     $controllerCompose = [regex]::Match($composeText, '(?ms)^  controller:.*?(?=^  build-agent:)').Value

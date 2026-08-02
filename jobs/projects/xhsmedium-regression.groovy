@@ -1,0 +1,140 @@
+pipelineJob('XHSMedium/Regression/scheduled') {
+    description('Runs the XHSMedium sealed scheduled-regression plan every two hours at a fixed dev SHA on the isolated Regression Agent and offline runtime DIND.')
+    parameters {
+        stringParam('BRANCH', 'dev', 'Trusted XHSMedium branch. Scheduled runs use dev.')
+        stringParam('GIT_SHA', '', 'Optional full SHA for a manually scheduled slot. It overrides branch resolution.')
+    }
+    definition {
+        cps {
+            sandbox(true)
+            script('''
+@Library('jenkins-platform-library') _
+
+pipeline {
+    agent { label 'xhsmedium-regression' }
+    environment {
+        XHSMEDIUM_REPOSITORY = 'https://github.com/MuFannnn/xhsmedium.git'
+        CI = 'true'
+        GIT_TERMINAL_PROMPT = '0'
+        npm_config_audit = 'false'
+        npm_config_fund = 'false'
+        npm_config_cache = "/tmp/${BUILD_TAG}-npm-cache"
+    }
+    triggers { cron('0 */2 * * *') }
+    options {
+        skipDefaultCheckout(true)
+        disableConcurrentBuilds(abortPrevious: false)
+        timeout(time: 7, unit: 'HOURS')
+        buildDiscarder(logRotator(numToKeepStr: '20'))
+    }
+    stages {
+        stage('Resolve fixed SHA') {
+            steps {
+                script {
+                    def requested = validateGitRef(branch: params.BRANCH, sha: params.GIT_SHA)
+                    env.REGRESSION_BRANCH = requested.branch
+                    if (requested.sha) {
+                        env.RESOLVED_SHA = requested.sha
+                    } else {
+                        withCredentials([usernamePassword(
+                            credentialsId: 'xhsmedium-scm-readonly',
+                            usernameVariable: 'SCM_USER',
+                            passwordVariable: 'SCM_TOKEN'
+                        )]) {
+                            env.SCM_ASKPASS_PATH = "/tmp/${env.BUILD_TAG}-regression-git-askpass"
+                            writeFile(file: '.git-askpass.sh', text: '#!/bin/sh\\ncase "$1" in\\n  *Username*) printf "%s\\\\n" "$SCM_USER" ;;\\n  *Password*) printf "%s\\\\n" "$SCM_TOKEN" ;;\\n  *) exit 1 ;;\\nesac\\n')
+                            try {
+                                env.RESOLVED_SHA = sh(
+                                    returnStdout: true,
+                                    script: 'set +x; install -m 700 .git-askpass.sh "$SCM_ASKPASS_PATH"; GIT_ASKPASS="$SCM_ASKPASS_PATH" GIT_ASKPASS_REQUIRE=force git ls-remote --exit-code --heads "$XHSMEDIUM_REPOSITORY" "refs/heads/$REGRESSION_BRANCH" | cut -f1'
+                                ).trim()
+                            } finally {
+                                sh 'rm -f .git-askpass.sh "$SCM_ASKPASS_PATH"'
+                            }
+                        }
+                    }
+                    env.RESOLVED_SHA = validateGitRef(branch: env.REGRESSION_BRANCH, sha: env.RESOLVED_SHA).sha
+                    env.XHSMEDIUM_DEPENDENCY_CACHE_PREFIX = "xhsmedium-deps-${env.RESOLVED_SHA.take(8)}"
+                    echo "RESOLVED_SHA=${env.RESOLVED_SHA}"
+                }
+            }
+        }
+        stage('Checkout and pin origin') {
+            steps {
+                platformCheckout(url: env.XHSMEDIUM_REPOSITORY, sha: env.RESOLVED_SHA, credentialsId: 'xhsmedium-scm-readonly')
+                sh(
+                    'set -eu\n' +
+                    'test "$(git rev-parse HEAD)" = "$RESOLVED_SHA"\n' +
+                    'git init --bare .pinned-origin.git\n' +
+                    'git push "file://$WORKSPACE/.pinned-origin.git" "$RESOLVED_SHA:refs/heads/$REGRESSION_BRANCH"\n' +
+                    'git remote set-url origin "file://$WORKSPACE/.pinned-origin.git"\n'
+                )
+            }
+        }
+        stage('Prepare offline runtime') {
+            steps {
+                script {
+                    ['backend', 'frontend', 'runner'].each { role ->
+                        sh """set -eu
+image='${env.XHSMEDIUM_DEPENDENCY_CACHE_PREFIX}-${role}:latest'
+test \"\$(docker image inspect --format '{{index .Config.Labels \\\"xhsmedium.preload.sha\\\"}}' \"\$image\")\" = '${env.RESOLVED_SHA}'
+test \"\$(docker image inspect --format '{{index .Config.Labels \\\"xhsmedium.preload.role\\\"}}' \"\$image\")\" = '${role}'
+"""
+                    }
+                    sh 'mkdir -p .platform-bin'
+                    writeFile(file: '.platform-bin/docker', text: libraryResource('xhsmedium/docker-offline-wrapper.sh'))
+                }
+                sh(
+                    'set -eu\n' +
+                    'chmod 700 .platform-bin/docker\n' +
+                    'npm ci --prefix regression --no-audit --no-fund\n' +
+                    'mkdir -p regression/worktrees\n' +
+                    'cp automation/package.json automation/package-lock.json regression/worktrees/\n' +
+                    'npm ci --prefix regression/worktrees --no-audit --no-fund\n' +
+                    'npm ci --prefix automation --no-audit --no-fund\n' +
+                    'npm run build --prefix automation\n'
+                )
+                script {
+                    def utcSlot = sh(returnStdout: true, script: 'date -u +%Y%m%d-%H%M').trim()
+                    env.EXPECTED_RUN_ID = "scheduled-${utcSlot}-${env.RESOLVED_SHA.take(8)}"
+                    env.XHSMEDIUM_DOCKER_PROJECT = "xhsmedium-test-${env.EXPECTED_RUN_ID}".toLowerCase().replaceAll(/[^a-z0-9_-]+/, '-').replaceAll(/^-+|-+$/, '').take(63)
+                    currentBuild.description = "SHA=${env.RESOLVED_SHA.take(8)} RUN=${env.EXPECTED_RUN_ID}"
+                }
+            }
+        }
+        stage('Sealed scheduled regression') {
+            steps {
+                sh(
+                    '#!/usr/bin/env bash\n' +
+                    'set -euo pipefail\n' +
+                    'export PATH="$WORKSPACE/.platform-bin:$WORKSPACE/regression/worktrees/node_modules/.bin:$PATH"\n' +
+                    'node regression/src/scheduled-entry.js --branch "$REGRESSION_BRANCH" --build-number "$BUILD_NUMBER" 2>&1 | tee scheduled-regression.log\n' +
+                    'grep -q PASSED scheduled-regression.log\n' +
+                    'test -f "artifacts/test-runs/$EXPECTED_RUN_ID/summary.json"\n' +
+                    'grep -q runId "artifacts/test-runs/$EXPECTED_RUN_ID/summary.json"\n' +
+                    'echo "P4_SCHEDULED_REGRESSION_OK runId=$EXPECTED_RUN_ID sha=$RESOLVED_SHA"\n'
+                )
+            }
+        }
+    }
+    post {
+        always {
+            sh(
+                'set -eu\n' +
+                'case "${XHSMEDIUM_DOCKER_PROJECT:-}" in\n' +
+                '  xhsmedium-test-scheduled-*) /usr/local/bin/docker compose -f "$WORKSPACE/automation/compose.test.yml" --project-name "$XHSMEDIUM_DOCKER_PROJECT" down --volumes --remove-orphans --timeout 30 ;;\n' +
+                'esac\n' +
+                'test -z "${SCM_ASKPASS_PATH:-}" || rm -f "$SCM_ASKPASS_PATH"\n' +
+                'case "$npm_config_cache" in /tmp/jenkins-XHSMedium-Regression-scheduled-*-npm-cache) rm -rf -- "$npm_config_cache" ;; *) false ;; esac\n'
+            )
+            archiveArtifacts artifacts: 'scheduled-regression.log,artifacts/test-runs/**,artifacts/regression/**', allowEmptyArchive: true, fingerprint: true
+            cleanupWorkspace()
+        }
+    }
+}
+'''.stripIndent())
+        }
+    }
+    logRotator { numToKeep(20) }
+    disabled(false)
+}

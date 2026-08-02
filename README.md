@@ -117,3 +117,4 @@ docker compose down
 - `docs/docker-isolation.md`：专用 DIND 与清理边界
 - `docs/xhsmedium-ci.md`：XHSMedium 手工只读 CI、证据和安全边界
 - `docs/xhsmedium-scm-polling.md`：每小时检查 dev 拉新并按新 SHA 触发 CI
+- `docs/xhsmedium-regression.md`：偶数整点 sealed 回归与受控离线依赖缓存
