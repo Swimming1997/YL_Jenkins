@@ -6,7 +6,7 @@ FROM mcr.microsoft.com/playwright:v1.59.1-noble@sha256:b0ab6f3cb99aa7803adbc14d9
 USER root
 RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install --yes --no-install-recommends \
-        ca-certificates git openjdk-21-jre-headless openssh-server tini \
+        ca-certificates g++ git make openjdk-21-jre-headless openssh-server python3 tini \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --create-home --home-dir /home/jenkins --shell /bin/bash --uid 1002 jenkins \
     && install -d -m 0755 /run/sshd \
@@ -30,6 +30,9 @@ RUN sed -i 's/\r$//' /usr/local/bin/platform-agent-entrypoint \
     && chmod 0755 /usr/local/bin/platform-agent-entrypoint /usr/local/bin/docker /usr/local/libexec/docker/cli-plugins/* \
     && node --version \
     && npm --version \
+    && python3 --version \
+    && make --version \
+    && g++ --version \
     && java -version \
     && docker --version \
     && docker compose version

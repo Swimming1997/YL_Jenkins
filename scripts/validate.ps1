@@ -32,6 +32,8 @@ try {
     Assert-True ($dockerfile -match 'jenkins/jenkins:2\.568\.1-jdk21@sha256:[0-9a-f]{64}') 'Jenkins numeric LTS tag and digest are pinned.'
     $buildAgentDockerfile = Get-Content -Raw -LiteralPath 'agents\build\Dockerfile'
     Assert-True ($buildAgentDockerfile -match '(?s)apt-get install.*?g\+\+\s+make\s+python3') 'Build Agent image installs the native Node.js build toolchain.'
+    $regressionAgentDockerfile = Get-Content -Raw -LiteralPath 'agents\regression\Dockerfile'
+    Assert-True ($regressionAgentDockerfile -match '(?s)apt-get install.*?g\+\+.*?make.*?python3' -and $regressionAgentDockerfile -match '(?s)python3 --version.*?make --version.*?g\+\+ --version') 'Regression Agent image installs and smokes the native Node.js build toolchain.'
 
     $plugins = Get-Content -LiteralPath 'plugins\plugins.txt' | Where-Object { $_.Trim() }
     $invalidPlugins = $plugins | Where-Object { $_ -notmatch '^[a-z0-9][a-z0-9-]*:[^:\s]+$' }

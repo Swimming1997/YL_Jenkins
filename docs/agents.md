@@ -5,7 +5,7 @@ P2 使用两个静态 Linux SSH Agent。Controller executor 保持为 0，业务
 | Agent | 标签 | 工具 | Docker权限 |
 |---|---|---|---|
 | Build Agent | `linux node20 xhsmedium-build` | Java 21、Git、Node 20、npm 10、Python 3、make、g++ | 无 Docker CLI、无 Docker Socket |
-| Regression Agent | `linux node20 docker-isolated xhsmedium-regression` | Java 21、Git、Node 20、npm 10、Playwright 1.59.1、Docker 29.3.1、Compose 5.1.1 | 只访问专用 TLS DIND |
+| Regression Agent | `linux node20 docker-isolated xhsmedium-regression` | Java 21、Git、Node 20、npm 10、Python 3、make、g++、Playwright 1.59.1、Docker 29.3.1、Compose 5.1.1 | 只访问专用 TLS DIND |
 
 Build Agent 的容器内存上限为 2 GiB，`/home/jenkins/agent` 是 2 GiB tmpfs。该挂载显式启用 `exec`，因为 Jenkins Git 凭据包装和 `node_modules/.bin` 必须在 Workspace 中执行；同时保留 `nosuid`、`nodev`、容器 `no-new-privileges`、能力裁剪、无 Docker CLI、无宿主机端口及构建后 Workspace 清理。云服务器部署时必须为该 Agent 预留至少 2 GiB 内存。
 
