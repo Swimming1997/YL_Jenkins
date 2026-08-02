@@ -45,7 +45,7 @@ try {
         Assert-True ($pluginNames -contains $required) "Required plugin '$required' is locked."
     }
 
-    foreach ($configFile in @('jcasc\jenkins.yaml', 'jcasc\security.yaml', 'jcasc\authorization.yaml', 'jcasc\jobs.yaml', 'jcasc\agents.yaml', 'jcasc\credentials.yaml', 'jobs\folders.groovy', 'jobs\seed.groovy', 'jobs\projects\xhsmedium-ci.groovy', 'jobs\projects\xhsmedium-regression.groovy', 'shared-library\vars\validateGitRef.groovy', 'shared-library\vars\nodeModuleCi.groovy', 'shared-library\vars\recordBuildMetadata.groovy', 'shared-library\vars\scmChangeDecision.groovy', 'shared-library\resources\xhsmedium\docker-offline-wrapper.sh', 'shared-library\resources\xhsmedium\mysql-entrypoint-compat.yaml', 'shared-library\resources\xhsmedium\mysql-init-wrapper.sh', 'scripts\preload-xhsmedium-regression.ps1', 'scripts\test-xhsmedium-regression.ps1', 'scripts\test-xhsmedium-watcher.ps1', 'agents\build\Dockerfile', 'agents\regression\Dockerfile')) {
+    foreach ($configFile in @('jcasc\jenkins.yaml', 'jcasc\security.yaml', 'jcasc\authorization.yaml', 'jcasc\jobs.yaml', 'jcasc\agents.yaml', 'jcasc\credentials.yaml', 'jobs\folders.groovy', 'jobs\seed.groovy', 'jobs\projects\xhsmedium-ci.groovy', 'jobs\projects\xhsmedium-regression.groovy', 'shared-library\vars\validateGitRef.groovy', 'shared-library\vars\nodeModuleCi.groovy', 'shared-library\vars\recordBuildMetadata.groovy', 'shared-library\vars\scmChangeDecision.groovy', 'shared-library\resources\xhsmedium\docker-offline-wrapper.sh', 'shared-library\resources\xhsmedium\mysql-entrypoint-compat.yaml', 'shared-library\resources\xhsmedium\mysql-init-wrapper.sh', 'shared-library\resources\xhsmedium\scheduled-slot-shim.cjs', 'scripts\preload-xhsmedium-regression.ps1', 'scripts\test-xhsmedium-regression.ps1', 'scripts\test-xhsmedium-watcher.ps1', 'agents\build\Dockerfile', 'agents\regression\Dockerfile')) {
         Assert-True (Test-Path -LiteralPath $configFile) "Configuration file '$configFile' exists."
     }
 
@@ -98,6 +98,7 @@ try {
     Assert-True ($xhsmediumRegression -match 'disableConcurrentBuilds\(abortPrevious: false\)') 'XHSMedium regression does not overlap scheduled runs.'
     Assert-True ($xhsmediumRegression -match 'libraryResource\(''xhsmedium/docker-offline-wrapper\.sh''\)') 'XHSMedium regression installs the reviewed offline Docker wrapper.'
     Assert-True ($xhsmediumRegression -match 'down --volumes --remove-orphans') 'XHSMedium regression performs exact Compose cleanup.'
+    Assert-True ($xhsmediumRegression -match 'VALIDATION_SLOT_UTC' -and $xhsmediumRegression -match 'VALIDATION_TIMEOUT_MINUTES must be between 0 and 30') 'XHSMedium regression bounds admin-only slot and timeout validation parameters.'
     Assert-True ($xhsmediumRegression -notmatch '(?i)ftp://|feishu|aliyun|ossutil|/var/run/docker\.sock') 'XHSMedium regression contains no external delivery or host Docker Socket operation.'
 
     $offlineWrapper = Get-Content -Raw -LiteralPath 'shared-library\resources\xhsmedium\docker-offline-wrapper.sh'
@@ -109,6 +110,8 @@ try {
     Assert-True ($mysqlCompatibility -match 'XHSMEDIUM_MYSQL_INIT_WRAPPER_PATH' -and $mysqlCompatibility -match 'XHSMEDIUM_ORIGINAL_MYSQL_INIT_PATH') 'MySQL compatibility override mounts the wrapper and original fixed-SHA script separately.'
     $mysqlInitWrapper = Get-Content -Raw -LiteralPath 'shared-library\resources\xhsmedium\mysql-init-wrapper.sh'
     Assert-True ($mysqlInitWrapper.Trim() -eq "#!/bin/sh`nbash /automation/original-initialize-database.sh") 'MySQL compatibility wrapper only executes the original script in a child shell.'
+    $slotShim = Get-Content -Raw -LiteralPath 'shared-library\resources\xhsmedium\scheduled-slot-shim.cjs'
+    Assert-True ($slotShim -match 'delete process\.env\.NODE_OPTIONS' -and $slotShim -match 'Invalid XHSMEDIUM_VALIDATION_SLOT_UTC') 'Scheduled slot shim validates its input and does not affect child Node processes.'
 
     $preloadScript = Get-Content -Raw -LiteralPath 'scripts\preload-xhsmedium-regression.ps1'
     Assert-True ($preloadScript -match "'--target', 'dependencies'" -and $preloadScript -match 'xhsmedium\.preload\.sha') 'Regression preloader builds labeled dependency stages.'
