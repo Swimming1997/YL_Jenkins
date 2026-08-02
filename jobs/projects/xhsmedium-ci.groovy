@@ -98,6 +98,7 @@ pipeline {
                     module: 'frontend',
                     logName: 'frontend.log',
                     commands: [
+                        'npm ci --prefix ../automation --no-audit --no-fund',
                         'npm ci --no-audit --no-fund',
                         'npm run lint',
                         'npm test',

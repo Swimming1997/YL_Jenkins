@@ -25,6 +25,8 @@ automation: npm ci → npm test → npm run validate
 regression: npm ci → npm test
 ```
 
+frontend e2e TypeScript 会导入 `automation/src/fixtures`。因此 frontend lint 前先按 `automation/package-lock.json` 执行一次 `npm ci --prefix ../automation`，确保 `mysql2` 等被导入模块的类型依赖可解析；这只是静态检查前置安装，不运行自动化业务流程或连接数据库。
+
 所有 npm 依赖均安装在容器内的临时 Workspace。作业禁止并发，后一次手工触发会取消仍在运行的前一次构建；全局超时为 45 分钟。无论成功、失败或超时，证据归档后都会删除 Workspace。
 
 每个模块结束时立即删除该模块的 `node_modules`，避免多个依赖树同时占用 tmpfs/cgroup 内存。npm cache 使用 `/tmp/${BUILD_TAG}-npm-cache` 唯一路径并在 `post` 精确清理；测试 JSON 和模块日志保留到归档完成。

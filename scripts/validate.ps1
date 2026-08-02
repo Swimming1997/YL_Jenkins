@@ -72,6 +72,7 @@ try {
     Assert-True ($xhsmediumCi -match 'GIT_ASKPASS_REQUIRE=force') 'XHSMedium branch resolution uses non-interactive Git credential handling.'
     Assert-True ($xhsmediumCi -match 'rm -f .*SCM_ASKPASS_PATH') 'XHSMedium CI explicitly cleans its temporary SCM AskPass wrapper.'
     Assert-True ($xhsmediumCi -match 'npm_config_cache = "/tmp/\$\{BUILD_TAG\}-npm-cache"' -and $xhsmediumCi -match 'rm -rf -- "\$npm_config_cache"') 'XHSMedium CI isolates and cleans its npm cache outside Workspace tmpfs.'
+    Assert-True ($xhsmediumCi -match 'npm ci --prefix \.\./automation --no-audit --no-fund') 'Frontend type checking installs its imported automation fixture dependencies from the locked module.'
     Assert-True ($xhsmediumCi -notmatch 'https://[^\s"'']*\$SCM_(?:USER|TOKEN)') 'XHSMedium CI never embeds SCM credentials in a URL.'
     Assert-True ($xhsmediumCi -match 'git diff --exit-code -- \.') 'XHSMedium CI checks that tracked source files remain unchanged.'
     Assert-True ($xhsmediumCi -notmatch '(?i)docker\s+(?:build|compose|run)|ftp://|feishu|aliyun|ossutil') 'XHSMedium CI contains no Docker, FTP, Feishu, or OSS operation.'
