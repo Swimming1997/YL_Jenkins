@@ -87,6 +87,8 @@ try {
     Assert-True (-not $compatResidue) 'Scheduled regression MySQL compatibility wrapper was cleaned.'
     $runnerEntrypointResidue = docker compose exec --no-TTY regression-agent sh -lc 'find /home/jenkins/agent/.platform-compat -maxdepth 1 -type f -name "jenkins-XHSMedium-Regression-scheduled-*-runner-entrypoint.sh" -print -quit 2>/dev/null || true'
     Assert-True (-not $runnerEntrypointResidue) 'Scheduled regression runner volume entrypoint was cleaned.'
+    $projectCleanupResidue = docker compose exec --no-TTY regression-agent sh -lc 'find /home/jenkins/agent/.platform-compat -maxdepth 1 -type f -name "jenkins-XHSMedium-Regression-scheduled-*-project-cleanup.sh" -print -quit 2>/dev/null || true'
+    Assert-True (-not $projectCleanupResidue) 'Scheduled regression exact project cleanup helper was cleaned.'
 }
 finally {
     Pop-Location

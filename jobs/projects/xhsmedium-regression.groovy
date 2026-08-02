@@ -24,6 +24,7 @@ pipeline {
         XHSMEDIUM_COMPOSE_OVERRIDE_PATH = "/tmp/${BUILD_TAG}-mysql-compat.yaml"
         XHSMEDIUM_MYSQL_INIT_WRAPPER_PATH = "/home/jenkins/agent/.platform-compat/${BUILD_TAG}-mysql-init-wrapper.sh"
         XHSMEDIUM_RUNNER_ENTRYPOINT_PATH = "/home/jenkins/agent/.platform-compat/${BUILD_TAG}-runner-entrypoint.sh"
+        XHSMEDIUM_PROJECT_CLEANUP_PATH = "/home/jenkins/agent/.platform-compat/${BUILD_TAG}-project-cleanup.sh"
     }
     triggers { cron('0 */2 * * *') }
     options {
@@ -91,6 +92,7 @@ test \"\\$(docker image inspect --format '{{index .Config.Labels \\\"xhsmedium.p
                     writeFile(file: '.mysql-entrypoint-compat.yaml', text: libraryResource('xhsmedium/mysql-entrypoint-compat.yaml'))
                     writeFile(file: '.mysql-init-wrapper.sh', text: libraryResource('xhsmedium/mysql-init-wrapper.sh'))
                     writeFile(file: '.runner-volume-entrypoint.sh', text: libraryResource('xhsmedium/runner-volume-entrypoint.sh'))
+                    writeFile(file: '.docker-project-cleanup.sh', text: libraryResource('xhsmedium/docker-project-cleanup.sh'))
                     env.XHSMEDIUM_RUNNER_UID = sh(returnStdout: true, script: 'id -u').trim()
                     env.XHSMEDIUM_RUNNER_GID = sh(returnStdout: true, script: 'id -g').trim()
                     env.XHSMEDIUM_ORIGINAL_MYSQL_INIT_PATH = "${env.WORKSPACE}/automation/fixtures/initialize-database.sh"
@@ -117,10 +119,12 @@ test \"\\$(docker image inspect --format '{{index .Config.Labels \\\"xhsmedium.p
                     'mkdir -p "$(dirname "$XHSMEDIUM_MYSQL_INIT_WRAPPER_PATH")"\\n' +
                     'install -m 644 .mysql-init-wrapper.sh "$XHSMEDIUM_MYSQL_INIT_WRAPPER_PATH"\\n' +
                     'install -m 755 .runner-volume-entrypoint.sh "$XHSMEDIUM_RUNNER_ENTRYPOINT_PATH"\\n' +
+                    'install -m 755 .docker-project-cleanup.sh "$XHSMEDIUM_PROJECT_CLEANUP_PATH"\\n' +
                     'if test -f .scheduled-slot-shim.cjs; then install -m 600 .scheduled-slot-shim.cjs "$XHSMEDIUM_SLOT_SHIM_PATH"; rm -f .scheduled-slot-shim.cjs; fi\\n' +
                     'rm -f .mysql-entrypoint-compat.yaml\\n' +
                     'rm -f .mysql-init-wrapper.sh\\n' +
                     'rm -f .runner-volume-entrypoint.sh\\n' +
+                    'rm -f .docker-project-cleanup.sh\\n' +
                     'npm ci --prefix regression --no-audit --no-fund\\n' +
                     'mkdir -p regression/worktrees\\n' +
                     'cp automation/package.json automation/package-lock.json regression/worktrees/\\n' +
@@ -163,17 +167,20 @@ test \"\\$(docker image inspect --format '{{index .Config.Labels \\\"xhsmedium.p
     post {
         always {
             sh(
-                'set -eu\\n' +
+                'set -u\\n' +
+                'cleanup_status=0\\n' +
                 'case "${XHSMEDIUM_DOCKER_PROJECT:-}" in\\n' +
-                '  xhsmedium-test-scheduled-*) /usr/local/bin/docker compose -f "$WORKSPACE/automation/compose.test.yml" --project-name "$XHSMEDIUM_DOCKER_PROJECT" down --volumes --remove-orphans --timeout 30 ;;\\n' +
+                '  xhsmedium-test-scheduled-*) /usr/local/bin/docker compose -f "$WORKSPACE/automation/compose.test.yml" --project-name "$XHSMEDIUM_DOCKER_PROJECT" down --volumes --remove-orphans --timeout 30 || cleanup_status=$?; "$XHSMEDIUM_PROJECT_CLEANUP_PATH" "$XHSMEDIUM_DOCKER_PROJECT" || cleanup_status=$? ;;\\n' +
                 'esac\\n' +
                 'test -z "${SCM_ASKPASS_PATH:-}" || rm -f "$SCM_ASKPASS_PATH"\\n' +
                 'test -z "${XHSMEDIUM_COMPOSE_OVERRIDE_PATH:-}" || rm -f "$XHSMEDIUM_COMPOSE_OVERRIDE_PATH"\\n' +
                 'test -z "${XHSMEDIUM_MYSQL_INIT_WRAPPER_PATH:-}" || rm -f "$XHSMEDIUM_MYSQL_INIT_WRAPPER_PATH"\\n' +
                 'test -z "${XHSMEDIUM_RUNNER_ENTRYPOINT_PATH:-}" || rm -f "$XHSMEDIUM_RUNNER_ENTRYPOINT_PATH"\\n' +
+                'test -z "${XHSMEDIUM_PROJECT_CLEANUP_PATH:-}" || rm -f "$XHSMEDIUM_PROJECT_CLEANUP_PATH"\\n' +
                 'test -z "${XHSMEDIUM_SLOT_SHIM_PATH:-}" || rm -f "$XHSMEDIUM_SLOT_SHIM_PATH"\\n' +
                 'rmdir /home/jenkins/agent/.platform-compat 2>/dev/null || true\\n' +
-                'case "$npm_config_cache" in /tmp/jenkins-XHSMedium-Regression-scheduled-*-npm-cache) rm -rf -- "$npm_config_cache" ;; *) false ;; esac\\n'
+                'case "$npm_config_cache" in /tmp/jenkins-XHSMedium-Regression-scheduled-*-npm-cache) rm -rf -- "$npm_config_cache" ;; *) cleanup_status=63 ;; esac\\n' +
+                'exit "$cleanup_status"\\n'
             )
             archiveArtifacts artifacts: 'scheduled-regression.log,artifacts/test-runs/**,artifacts/regression/**', allowEmptyArchive: true, fingerprint: true
             cleanupWorkspace()
