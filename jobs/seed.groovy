@@ -52,7 +52,7 @@ pipeline {
     stages {
         stage('Toolchain') {
             steps {
-                sh 'java -version && git --version && node --version && npm --version'
+                sh 'java -version && git --version && node --version && npm --version && python3 --version && make --version && g++ --version'
                 sh 'if command -v docker >/dev/null 2>&1; then echo "Docker must not exist on Build Agent" >&2; exit 1; fi'
                 echo 'BUILD_AGENT_OK'
             }

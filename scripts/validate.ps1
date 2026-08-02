@@ -30,6 +30,8 @@ try {
 
     $dockerfile = Get-Content -Raw -LiteralPath 'controller\Dockerfile'
     Assert-True ($dockerfile -match 'jenkins/jenkins:2\.568\.1-jdk21@sha256:[0-9a-f]{64}') 'Jenkins numeric LTS tag and digest are pinned.'
+    $buildAgentDockerfile = Get-Content -Raw -LiteralPath 'agents\build\Dockerfile'
+    Assert-True ($buildAgentDockerfile -match '(?s)apt-get install.*?g\+\+\s+make\s+python3') 'Build Agent image installs the native Node.js build toolchain.'
 
     $plugins = Get-Content -LiteralPath 'plugins\plugins.txt' | Where-Object { $_.Trim() }
     $invalidPlugins = $plugins | Where-Object { $_ -notmatch '^[a-z0-9][a-z0-9-]*:[^:\s]+$' }
@@ -88,6 +90,8 @@ try {
     Assert-True ($buildAgentCompose -notmatch 'xhsmedium_scm_token') 'Build Agent does not mount the XHSMedium SCM Docker Secret.'
     Assert-True ($buildAgentCompose -match '/home/jenkins/agent:size=2g,uid=1000,gid=1000,mode=0700,exec') 'Build Agent Workspace tmpfs explicitly permits CI tool execution.'
     Assert-True ($buildAgentCompose -match 'mem_limit:\s*2g') 'Build Agent has the confirmed 2 GiB memory limit.'
+    $seedJobs = Get-Content -Raw -LiteralPath 'jobs\seed.groovy'
+    Assert-True ($seedJobs -match 'python3 --version && make --version && g\+\+ --version') 'Build Agent smoke verifies the native Node.js build toolchain.'
 
     docker compose config --quiet
     Assert-True ($LASTEXITCODE -eq 0) 'Docker Compose configuration is valid.'

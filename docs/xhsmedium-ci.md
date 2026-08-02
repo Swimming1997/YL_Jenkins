@@ -35,6 +35,8 @@ Build Agent Workspace tmpfs 允许执行 Jenkins Git 包装及 `node_modules/.bi
 
 CI 使用 2 GiB Build Agent，并按模块限制 Node heap：backend 为 768 MiB，frontend 为 1536 MiB，automation 和 regression 为 512 MiB。模块保持串行，避免 Node 与 Jenkins Agent JVM 共同触发 cgroup OOM。
 
+Regression control-plane 的 `better-sqlite3` 若没有与当前 Node 版本匹配的预编译包，会在 Build Agent 容器内使用 Python 3、make 和 g++ 通过 `node-gyp` 编译；不会调用宿主机工具链或 DIND。
+
 backend 的 `npm run lint` 当前包含 `--fix`，因此被明确排除。构建控制台和元数据会报告该质量缺口；在 XHSMedium 增加只读 `lint:check` 前，不能把该缺口解释为已通过。
 
 ## 证据与边界
