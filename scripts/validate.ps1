@@ -65,6 +65,7 @@ try {
     Assert-True ($libraryConfig -match 'job-dsl/projects/xhsmedium-ci\.groovy') 'XHSMedium read-only CI Job DSL is loaded by JCasC.'
 
     $xhsmediumCi = Get-Content -Raw -LiteralPath 'jobs\projects\xhsmedium-ci.groovy'
+    Assert-True (([regex]::Matches($xhsmediumCi, "script\('''")).Count -eq 2 -and ([regex]::Matches($xhsmediumCi, "'''\.stripIndent\(\)")).Count -eq 2) 'Each XHSMedium Job DSL Pipeline script has an independent balanced boundary.'
     Assert-True ($xhsmediumCi -match "pipelineJob\('XHSMedium/CI/read-only'\)") 'XHSMedium read-only CI job has the expected fixed path.'
     Assert-True ($xhsmediumCi -match "XHSMEDIUM_REPOSITORY = 'https://github.com/MuFannnn/xhsmedium.git'") 'XHSMedium repository URL is fixed in the job.'
     Assert-True ($xhsmediumCi -match "agent \{ label 'xhsmedium-build' \}") 'XHSMedium CI is restricted to the Build Agent.'

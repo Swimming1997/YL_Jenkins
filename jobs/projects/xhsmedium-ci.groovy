@@ -151,6 +151,14 @@ pipeline {
         }
     }
 }
+'''.stripIndent())
+        }
+    }
+    logRotator {
+        numToKeep(20)
+    }
+    disabled(false)
+}
 
 pipelineJob('XHSMedium/CI/watch-dev') {
     description('Checks the private XHSMedium dev branch once per hour and triggers read-only CI exactly once for each newly observed SHA.')
@@ -237,13 +245,5 @@ pipeline {
         }
     }
     logRotator { numToKeep(30) }
-    disabled(false)
-}
-'''.stripIndent())
-        }
-    }
-    logRotator {
-        numToKeep(20)
-    }
     disabled(false)
 }
