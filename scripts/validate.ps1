@@ -100,6 +100,7 @@ try {
     Assert-True ($xhsmediumRegression -match 'down --volumes --remove-orphans') 'XHSMedium regression performs exact Compose cleanup.'
     Assert-True ($xhsmediumRegression -match 'VALIDATION_SLOT_UTC' -and $xhsmediumRegression -match 'VALIDATION_TIMEOUT_MINUTES must be between 0 and 30') 'XHSMedium regression bounds admin-only slot and timeout validation parameters.'
     Assert-True ($xhsmediumRegression -match 'NODE_OPTIONS="\$\{SCHEDULE_NODE_OPTIONS:-\}"') 'Production scheduled runs tolerate an absent validation slot shim.'
+    Assert-True ($xhsmediumRegression -match 'substring\(11, 19\)' -and $xhsmediumRegression -match '%Y%m%d-%H%M00') 'Expected Compose project preserves the scheduler HHmmss runId format.'
     Assert-True ($xhsmediumRegression -notmatch '(?i)ftp://|feishu|aliyun|ossutil|/var/run/docker\.sock') 'XHSMedium regression contains no external delivery or host Docker Socket operation.'
 
     $offlineWrapper = Get-Content -Raw -LiteralPath 'shared-library\resources\xhsmedium\docker-offline-wrapper.sh'

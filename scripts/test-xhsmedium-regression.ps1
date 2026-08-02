@@ -57,7 +57,7 @@ Assert-True ($console -match 'OFFLINE_DEPENDENCY_CACHE role=runner') 'Runner ima
 Assert-True ($console -match 'OFFLINE_DEPENDENCY_CACHE role=backend,frontend') 'Backend and frontend images used offline dependency caches.'
 Assert-True ($console -match 'P4_SCHEDULED_REGRESSION_OK') 'Scheduled regression emitted its completion marker.'
 
-$identity = [regex]::Match($console, 'P4_SCHEDULED_REGRESSION_OK runId=(scheduled-[0-9]{8}-[0-9]{4}-[0-9a-f]{8}) sha=([0-9a-f]{40})')
+$identity = [regex]::Match($console, 'P4_SCHEDULED_REGRESSION_OK runId=(scheduled-[0-9]{8}-[0-9]{6}-[0-9a-f]{8}) sha=([0-9a-f]{40})')
 Assert-True ($identity.Success) 'Console records a unique scheduled runId and full SHA.'
 $runId = $identity.Groups[1].Value
 $sha = $identity.Groups[2].Value

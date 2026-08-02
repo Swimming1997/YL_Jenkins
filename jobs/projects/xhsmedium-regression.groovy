@@ -124,8 +124,8 @@ test \"\\$(docker image inspect --format '{{index .Config.Labels \\\"xhsmedium.p
                 )
                 script {
                     def utcSlot = env.XHSMEDIUM_VALIDATION_SLOT_UTC ?
-                        env.XHSMEDIUM_VALIDATION_SLOT_UTC.substring(0, 10).replace('-', '') + '-' + env.XHSMEDIUM_VALIDATION_SLOT_UTC.substring(11, 16).replace(':', '') :
-                        sh(returnStdout: true, script: 'date -u +%Y%m%d-%H%M').trim()
+                        env.XHSMEDIUM_VALIDATION_SLOT_UTC.substring(0, 10).replace('-', '') + '-' + env.XHSMEDIUM_VALIDATION_SLOT_UTC.substring(11, 19).replace(':', '') :
+                        sh(returnStdout: true, script: 'date -u +%Y%m%d-%H%M00').trim()
                     env.EXPECTED_RUN_ID = "scheduled-${utcSlot}-${env.RESOLVED_SHA.take(8)}"
                     env.XHSMEDIUM_DOCKER_PROJECT = "xhsmedium-test-${env.EXPECTED_RUN_ID}".toLowerCase().replaceAll(/[^a-z0-9_-]+/, '-').replaceAll(/^-+|-+$/, '').take(63)
                     currentBuild.description = "SHA=${env.RESOLVED_SHA.take(8)} RUN=${env.EXPECTED_RUN_ID}"
