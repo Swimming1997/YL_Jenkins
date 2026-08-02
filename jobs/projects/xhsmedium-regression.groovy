@@ -65,11 +65,11 @@ pipeline {
             steps {
                 platformCheckout(url: env.XHSMEDIUM_REPOSITORY, sha: env.RESOLVED_SHA, credentialsId: 'xhsmedium-scm-readonly')
                 sh(
-                    'set -eu\n' +
-                    'test "$(git rev-parse HEAD)" = "$RESOLVED_SHA"\n' +
-                    'git init --bare .pinned-origin.git\n' +
-                    'git push "file://$WORKSPACE/.pinned-origin.git" "$RESOLVED_SHA:refs/heads/$REGRESSION_BRANCH"\n' +
-                    'git remote set-url origin "file://$WORKSPACE/.pinned-origin.git"\n'
+                    'set -eu\\n' +
+                    'test "$(git rev-parse HEAD)" = "$RESOLVED_SHA"\\n' +
+                    'git init --bare .pinned-origin.git\\n' +
+                    'git push "file://$WORKSPACE/.pinned-origin.git" "$RESOLVED_SHA:refs/heads/$REGRESSION_BRANCH"\\n' +
+                    'git remote set-url origin "file://$WORKSPACE/.pinned-origin.git"\\n'
                 )
             }
         }
@@ -90,19 +90,19 @@ test \"\$(docker image inspect --format '{{index .Config.Labels \\\"xhsmedium.pr
                     env.XHSMEDIUM_ORIGINAL_MYSQL_INIT_PATH = "${env.WORKSPACE}/automation/fixtures/initialize-database.sh"
                 }
                 sh(
-                    'set -eu\n' +
-                    'chmod 700 .platform-bin/docker\n' +
-                    'install -m 600 .mysql-entrypoint-compat.yaml "$XHSMEDIUM_COMPOSE_OVERRIDE_PATH"\n' +
-                    'mkdir -p "$(dirname "$XHSMEDIUM_MYSQL_INIT_WRAPPER_PATH")"\n' +
-                    'install -m 644 .mysql-init-wrapper.sh "$XHSMEDIUM_MYSQL_INIT_WRAPPER_PATH"\n' +
-                    'rm -f .mysql-entrypoint-compat.yaml\n' +
-                    'rm -f .mysql-init-wrapper.sh\n' +
-                    'npm ci --prefix regression --no-audit --no-fund\n' +
-                    'mkdir -p regression/worktrees\n' +
-                    'cp automation/package.json automation/package-lock.json regression/worktrees/\n' +
-                    'npm ci --prefix regression/worktrees --no-audit --no-fund\n' +
-                    'npm ci --prefix automation --no-audit --no-fund\n' +
-                    'npm run build --prefix automation\n'
+                    'set -eu\\n' +
+                    'chmod 700 .platform-bin/docker\\n' +
+                    'install -m 600 .mysql-entrypoint-compat.yaml "$XHSMEDIUM_COMPOSE_OVERRIDE_PATH"\\n' +
+                    'mkdir -p "$(dirname "$XHSMEDIUM_MYSQL_INIT_WRAPPER_PATH")"\\n' +
+                    'install -m 644 .mysql-init-wrapper.sh "$XHSMEDIUM_MYSQL_INIT_WRAPPER_PATH"\\n' +
+                    'rm -f .mysql-entrypoint-compat.yaml\\n' +
+                    'rm -f .mysql-init-wrapper.sh\\n' +
+                    'npm ci --prefix regression --no-audit --no-fund\\n' +
+                    'mkdir -p regression/worktrees\\n' +
+                    'cp automation/package.json automation/package-lock.json regression/worktrees/\\n' +
+                    'npm ci --prefix regression/worktrees --no-audit --no-fund\\n' +
+                    'npm ci --prefix automation --no-audit --no-fund\\n' +
+                    'npm run build --prefix automation\\n'
                 )
                 script {
                     def utcSlot = sh(returnStdout: true, script: 'date -u +%Y%m%d-%H%M').trim()
@@ -115,14 +115,14 @@ test \"\$(docker image inspect --format '{{index .Config.Labels \\\"xhsmedium.pr
         stage('Sealed scheduled regression') {
             steps {
                 sh(
-                    '#!/usr/bin/env bash\n' +
-                    'set -euo pipefail\n' +
-                    'export PATH="$WORKSPACE/.platform-bin:$WORKSPACE/regression/worktrees/node_modules/.bin:$PATH"\n' +
-                    'node regression/src/scheduled-entry.js --branch "$REGRESSION_BRANCH" --build-number "$BUILD_NUMBER" 2>&1 | tee scheduled-regression.log\n' +
-                    'grep -q PASSED scheduled-regression.log\n' +
-                    'test -f "artifacts/test-runs/$EXPECTED_RUN_ID/summary.json"\n' +
-                    'grep -q runId "artifacts/test-runs/$EXPECTED_RUN_ID/summary.json"\n' +
-                    'echo "P4_SCHEDULED_REGRESSION_OK runId=$EXPECTED_RUN_ID sha=$RESOLVED_SHA"\n'
+                    '#!/usr/bin/env bash\\n' +
+                    'set -euo pipefail\\n' +
+                    'export PATH="$WORKSPACE/.platform-bin:$WORKSPACE/regression/worktrees/node_modules/.bin:$PATH"\\n' +
+                    'node regression/src/scheduled-entry.js --branch "$REGRESSION_BRANCH" --build-number "$BUILD_NUMBER" 2>&1 | tee scheduled-regression.log\\n' +
+                    'grep -q PASSED scheduled-regression.log\\n' +
+                    'test -f "artifacts/test-runs/$EXPECTED_RUN_ID/summary.json"\\n' +
+                    'grep -q runId "artifacts/test-runs/$EXPECTED_RUN_ID/summary.json"\\n' +
+                    'echo "P4_SCHEDULED_REGRESSION_OK runId=$EXPECTED_RUN_ID sha=$RESOLVED_SHA"\\n'
                 )
             }
         }
@@ -130,15 +130,15 @@ test \"\$(docker image inspect --format '{{index .Config.Labels \\\"xhsmedium.pr
     post {
         always {
             sh(
-                'set -eu\n' +
-                'case "${XHSMEDIUM_DOCKER_PROJECT:-}" in\n' +
-                '  xhsmedium-test-scheduled-*) /usr/local/bin/docker compose -f "$WORKSPACE/automation/compose.test.yml" --project-name "$XHSMEDIUM_DOCKER_PROJECT" down --volumes --remove-orphans --timeout 30 ;;\n' +
-                'esac\n' +
-                'test -z "${SCM_ASKPASS_PATH:-}" || rm -f "$SCM_ASKPASS_PATH"\n' +
-                'test -z "${XHSMEDIUM_COMPOSE_OVERRIDE_PATH:-}" || rm -f "$XHSMEDIUM_COMPOSE_OVERRIDE_PATH"\n' +
-                'test -z "${XHSMEDIUM_MYSQL_INIT_WRAPPER_PATH:-}" || rm -f "$XHSMEDIUM_MYSQL_INIT_WRAPPER_PATH"\n' +
-                'rmdir /home/jenkins/agent/.platform-compat 2>/dev/null || true\n' +
-                'case "$npm_config_cache" in /tmp/jenkins-XHSMedium-Regression-scheduled-*-npm-cache) rm -rf -- "$npm_config_cache" ;; *) false ;; esac\n'
+                'set -eu\\n' +
+                'case "${XHSMEDIUM_DOCKER_PROJECT:-}" in\\n' +
+                '  xhsmedium-test-scheduled-*) /usr/local/bin/docker compose -f "$WORKSPACE/automation/compose.test.yml" --project-name "$XHSMEDIUM_DOCKER_PROJECT" down --volumes --remove-orphans --timeout 30 ;;\\n' +
+                'esac\\n' +
+                'test -z "${SCM_ASKPASS_PATH:-}" || rm -f "$SCM_ASKPASS_PATH"\\n' +
+                'test -z "${XHSMEDIUM_COMPOSE_OVERRIDE_PATH:-}" || rm -f "$XHSMEDIUM_COMPOSE_OVERRIDE_PATH"\\n' +
+                'test -z "${XHSMEDIUM_MYSQL_INIT_WRAPPER_PATH:-}" || rm -f "$XHSMEDIUM_MYSQL_INIT_WRAPPER_PATH"\\n' +
+                'rmdir /home/jenkins/agent/.platform-compat 2>/dev/null || true\\n' +
+                'case "$npm_config_cache" in /tmp/jenkins-XHSMedium-Regression-scheduled-*-npm-cache) rm -rf -- "$npm_config_cache" ;; *) false ;; esac\\n'
             )
             archiveArtifacts artifacts: 'scheduled-regression.log,artifacts/test-runs/**,artifacts/regression/**', allowEmptyArchive: true, fingerprint: true
             cleanupWorkspace()
