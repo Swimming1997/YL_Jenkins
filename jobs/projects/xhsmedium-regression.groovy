@@ -19,6 +19,8 @@ pipeline {
         npm_config_audit = 'false'
         npm_config_fund = 'false'
         npm_config_cache = "/tmp/${BUILD_TAG}-npm-cache"
+        XHSMEDIUM_COMPOSE_OVERRIDE_PATH = "/tmp/${BUILD_TAG}-mysql-compat.yaml"
+        XHSMEDIUM_MYSQL_INIT_WRAPPER_PATH = "/home/jenkins/agent/.platform-compat/${BUILD_TAG}-mysql-init-wrapper.sh"
     }
     triggers { cron('0 */2 * * *') }
     options {
@@ -83,10 +85,18 @@ test \"\$(docker image inspect --format '{{index .Config.Labels \\\"xhsmedium.pr
                     }
                     sh 'mkdir -p .platform-bin'
                     writeFile(file: '.platform-bin/docker', text: libraryResource('xhsmedium/docker-offline-wrapper.sh'))
+                    writeFile(file: '.mysql-entrypoint-compat.yaml', text: libraryResource('xhsmedium/mysql-entrypoint-compat.yaml'))
+                    writeFile(file: '.mysql-init-wrapper.sh', text: libraryResource('xhsmedium/mysql-init-wrapper.sh'))
+                    env.XHSMEDIUM_ORIGINAL_MYSQL_INIT_PATH = "${env.WORKSPACE}/automation/fixtures/initialize-database.sh"
                 }
                 sh(
                     'set -eu\n' +
                     'chmod 700 .platform-bin/docker\n' +
+                    'install -m 600 .mysql-entrypoint-compat.yaml "$XHSMEDIUM_COMPOSE_OVERRIDE_PATH"\n' +
+                    'mkdir -p "$(dirname "$XHSMEDIUM_MYSQL_INIT_WRAPPER_PATH")"\n' +
+                    'install -m 644 .mysql-init-wrapper.sh "$XHSMEDIUM_MYSQL_INIT_WRAPPER_PATH"\n' +
+                    'rm -f .mysql-entrypoint-compat.yaml\n' +
+                    'rm -f .mysql-init-wrapper.sh\n' +
                     'npm ci --prefix regression --no-audit --no-fund\n' +
                     'mkdir -p regression/worktrees\n' +
                     'cp automation/package.json automation/package-lock.json regression/worktrees/\n' +
@@ -125,6 +135,9 @@ test \"\$(docker image inspect --format '{{index .Config.Labels \\\"xhsmedium.pr
                 '  xhsmedium-test-scheduled-*) /usr/local/bin/docker compose -f "$WORKSPACE/automation/compose.test.yml" --project-name "$XHSMEDIUM_DOCKER_PROJECT" down --volumes --remove-orphans --timeout 30 ;;\n' +
                 'esac\n' +
                 'test -z "${SCM_ASKPASS_PATH:-}" || rm -f "$SCM_ASKPASS_PATH"\n' +
+                'test -z "${XHSMEDIUM_COMPOSE_OVERRIDE_PATH:-}" || rm -f "$XHSMEDIUM_COMPOSE_OVERRIDE_PATH"\n' +
+                'test -z "${XHSMEDIUM_MYSQL_INIT_WRAPPER_PATH:-}" || rm -f "$XHSMEDIUM_MYSQL_INIT_WRAPPER_PATH"\n' +
+                'rmdir /home/jenkins/agent/.platform-compat 2>/dev/null || true\n' +
                 'case "$npm_config_cache" in /tmp/jenkins-XHSMedium-Regression-scheduled-*-npm-cache) rm -rf -- "$npm_config_cache" ;; *) false ;; esac\n'
             )
             archiveArtifacts artifacts: 'scheduled-regression.log,artifacts/test-runs/**,artifacts/regression/**', allowEmptyArchive: true, fingerprint: true

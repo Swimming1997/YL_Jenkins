@@ -83,6 +83,8 @@ try {
     Assert-True (-not $workspaceResidue) 'Scheduled regression Workspace was cleaned.'
     $cacheResidue = docker compose exec --no-TTY regression-agent sh -lc 'find /tmp -maxdepth 1 -name "jenkins-XHSMedium-Regression-scheduled-*-npm-cache" -print -quit'
     Assert-True (-not $cacheResidue) 'Scheduled regression npm cache was cleaned.'
+    $compatResidue = docker compose exec --no-TTY regression-agent sh -lc 'find /home/jenkins/agent/.platform-compat -maxdepth 1 -type f -name "jenkins-XHSMedium-Regression-scheduled-*-mysql-init-wrapper.sh" -print -quit 2>/dev/null || true'
+    Assert-True (-not $compatResidue) 'Scheduled regression MySQL compatibility wrapper was cleaned.'
 }
 finally {
     Pop-Location

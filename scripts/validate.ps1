@@ -43,7 +43,7 @@ try {
         Assert-True ($pluginNames -contains $required) "Required plugin '$required' is locked."
     }
 
-    foreach ($configFile in @('jcasc\jenkins.yaml', 'jcasc\security.yaml', 'jcasc\authorization.yaml', 'jcasc\jobs.yaml', 'jcasc\agents.yaml', 'jcasc\credentials.yaml', 'jobs\folders.groovy', 'jobs\seed.groovy', 'jobs\projects\xhsmedium-ci.groovy', 'jobs\projects\xhsmedium-regression.groovy', 'shared-library\vars\validateGitRef.groovy', 'shared-library\vars\nodeModuleCi.groovy', 'shared-library\vars\recordBuildMetadata.groovy', 'shared-library\vars\scmChangeDecision.groovy', 'shared-library\resources\xhsmedium\docker-offline-wrapper.sh', 'scripts\preload-xhsmedium-regression.ps1', 'scripts\test-xhsmedium-regression.ps1', 'scripts\test-xhsmedium-watcher.ps1', 'agents\build\Dockerfile', 'agents\regression\Dockerfile')) {
+    foreach ($configFile in @('jcasc\jenkins.yaml', 'jcasc\security.yaml', 'jcasc\authorization.yaml', 'jcasc\jobs.yaml', 'jcasc\agents.yaml', 'jcasc\credentials.yaml', 'jobs\folders.groovy', 'jobs\seed.groovy', 'jobs\projects\xhsmedium-ci.groovy', 'jobs\projects\xhsmedium-regression.groovy', 'shared-library\vars\validateGitRef.groovy', 'shared-library\vars\nodeModuleCi.groovy', 'shared-library\vars\recordBuildMetadata.groovy', 'shared-library\vars\scmChangeDecision.groovy', 'shared-library\resources\xhsmedium\docker-offline-wrapper.sh', 'shared-library\resources\xhsmedium\mysql-entrypoint-compat.yaml', 'shared-library\resources\xhsmedium\mysql-init-wrapper.sh', 'scripts\preload-xhsmedium-regression.ps1', 'scripts\test-xhsmedium-regression.ps1', 'scripts\test-xhsmedium-watcher.ps1', 'agents\build\Dockerfile', 'agents\regression\Dockerfile')) {
         Assert-True (Test-Path -LiteralPath $configFile) "Configuration file '$configFile' exists."
     }
 
@@ -99,7 +99,12 @@ try {
     $offlineWrapper = Get-Content -Raw -LiteralPath 'shared-library\resources\xhsmedium\docker-offline-wrapper.sh'
     Assert-True ($offlineWrapper -match 'xhsmedium\.preload\.sha' -and $offlineWrapper -match 'xhsmedium\.preload\.role') 'Offline Docker wrapper verifies full SHA and role labels.'
     Assert-True ($offlineWrapper -match 'OFFLINE_DEPENDENCY_CACHE' -and $offlineWrapper -match 'NPM_OFFLINE=true') 'Offline Docker wrapper reports and enforces cache use.'
+    Assert-True ($offlineWrapper -match 'XHSMEDIUM_COMPOSE_OVERRIDE_PATH' -and $offlineWrapper -match 'prefix=.*-f.*compose_override') 'Offline Docker wrapper applies the external MySQL compatibility override.'
     Assert-True ($offlineWrapper -notmatch '/var/run/docker\.sock') 'Offline Docker wrapper never references the host Docker Socket.'
+    $mysqlCompatibility = Get-Content -Raw -LiteralPath 'shared-library\resources\xhsmedium\mysql-entrypoint-compat.yaml'
+    Assert-True ($mysqlCompatibility -match 'XHSMEDIUM_MYSQL_INIT_WRAPPER_PATH' -and $mysqlCompatibility -match 'XHSMEDIUM_ORIGINAL_MYSQL_INIT_PATH') 'MySQL compatibility override mounts the wrapper and original fixed-SHA script separately.'
+    $mysqlInitWrapper = Get-Content -Raw -LiteralPath 'shared-library\resources\xhsmedium\mysql-init-wrapper.sh'
+    Assert-True ($mysqlInitWrapper.Trim() -eq "#!/bin/sh`nbash /automation/original-initialize-database.sh") 'MySQL compatibility wrapper only executes the original script in a child shell.'
 
     $preloadScript = Get-Content -Raw -LiteralPath 'scripts\preload-xhsmedium-regression.ps1'
     Assert-True ($preloadScript -match "'--target', 'dependencies'" -and $preloadScript -match 'xhsmedium\.preload\.sha') 'Regression preloader builds labeled dependency stages.'
@@ -113,6 +118,7 @@ try {
     Assert-True (([regex]::Matches($composeText, '(?m)^\s+privileged:\s+true\s*$')).Count -eq 1) 'Exactly one service, isolated DIND, is privileged.'
     Assert-True ($composeText -match '(?s)build-agent:.*?networks:\s*\r?\n\s*- control') 'Build Agent is attached to the control network.'
     Assert-True ($composeText -match '(?s)regression-agent:.*?regression_docker') 'Regression Agent is attached to the isolated Docker network.'
+    Assert-True (([regex]::Matches($composeText, 'regression_workspace:/home/jenkins/agent')).Count -eq 2) 'Regression Agent and DIND share the exact remote Workspace path.'
     Assert-True ($controllerCompose -match '(?s)secrets:.*?- xhsmedium_scm_token') 'Controller receives the XHSMedium SCM Docker Secret.'
     Assert-True ($buildAgentCompose -notmatch 'xhsmedium_scm_token') 'Build Agent does not mount the XHSMedium SCM Docker Secret.'
     Assert-True ($buildAgentCompose -match '/home/jenkins/agent:size=2g,uid=1000,gid=1000,mode=0700,exec') 'Build Agent Workspace tmpfs explicitly permits CI tool execution.'
@@ -173,6 +179,11 @@ try {
         Assert-True ($buildWorkspaceOptions -contains 'nosuid' -and $buildWorkspaceOptions -contains 'nodev') 'Running Build Agent Workspace retains nosuid and nodev isolation.'
         Assert-True (-not @($regressionInspect.NetworkSettings.Ports.PSObject.Properties | Where-Object Value).Count) 'Regression Agent publishes no host port.'
         Assert-True ($dindInspect.HostConfig.Privileged) 'Isolated DIND is privileged.'
+        $regressionWorkspaceMount = @($regressionInspect.Mounts | Where-Object Destination -eq '/home/jenkins/agent')
+        $dindWorkspaceMount = @($dindInspect.Mounts | Where-Object Destination -eq '/home/jenkins/agent')
+        Assert-True ($regressionWorkspaceMount.Count -eq 1 -and $dindWorkspaceMount.Count -eq 1 -and $regressionWorkspaceMount[0].Type -eq 'volume' -and $regressionWorkspaceMount[0].Name -eq $dindWorkspaceMount[0].Name) 'Running Regression Agent and DIND use the same named Workspace volume.'
+        $regressionWorkspaceIdentity = (docker exec $serviceIds['regression-agent'] stat -c '%u:%g:%a' /home/jenkins/agent).Trim()
+        Assert-True ($regressionWorkspaceIdentity -eq '1002:1002:700') 'Running Regression Workspace is private to the Jenkins Agent user.'
         $socketMounts = @($buildInspect, $regressionInspect, $dindInspect | ForEach-Object { $_.Mounts } | Where-Object { $_.Source -match 'docker\.sock' })
         Assert-True ($socketMounts.Count -eq 0) 'Agent services do not mount the host Docker Socket.'
     }

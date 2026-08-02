@@ -92,8 +92,7 @@ services:
       - regression_agent_ssh_public_key
     volumes:
       - regression_docker_certs:/certs/client:ro
-    tmpfs:
-      - /home/jenkins/agent:size=2g,uid=1002,gid=1002,mode=0700
+      - regression_workspace:/home/jenkins/agent
     networks:
       - control
       - regression_docker
@@ -132,6 +131,7 @@ services:
     volumes:
       - regression_docker_certs:/certs/client
       - regression_docker_data:/var/lib/docker
+      - regression_workspace:/home/jenkins/agent
     networks:
       - regression_docker
     healthcheck:
@@ -151,6 +151,8 @@ volumes:
     name: ${REGRESSION_DOCKER_CERTS_VOLUME:-jenkins_platform_regression_docker_certs}
   regression_docker_data:
     name: ${REGRESSION_DOCKER_DATA_VOLUME:-jenkins_platform_regression_docker_data}
+  regression_workspace:
+    name: ${REGRESSION_WORKSPACE_VOLUME:-jenkins_platform_regression_workspace}
 
 networks:
   control:

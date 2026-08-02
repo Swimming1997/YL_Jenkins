@@ -8,4 +8,5 @@ if [[ ! -s "${key_file}" ]]; then
 fi
 
 install -m 0600 -o jenkins -g jenkins "${key_file}" /home/jenkins/.ssh/authorized_keys
+install -d -m 0700 -o jenkins -g jenkins /home/jenkins/agent
 exec /usr/sbin/sshd -D -e

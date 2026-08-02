@@ -13,6 +13,8 @@
 
 业务容器只在隔离的 `regression-docker`中运行。该 DIND 不挂载宿主机 Docker Socket、不发布端口，也没有公网出口。
 
+Regression Agent 与 DIND 通过同路径的专用 `regression_workspace`命名卷共享 Jenkins Workspace。该共享是远程 Docker bind mount 正确工作的必要条件；Controller、Build Agent 和宿主机目录均不挂载该卷。
+
 ## 受控离线依赖缓存
 
 XHSMedium Dockerfile 的 `dependencies` target 先在宿主机 Docker 中按固定 SHA 构建。平台脚本为镜像写入完整 SHA 与角色标签，随后通过临时 tar 导入隔离 DIND：
@@ -24,6 +26,8 @@ XHSMedium Dockerfile 的 `dependencies` target 先在宿主机 Docker 中按固�
 ```
 
 Jenkins 运行时要求缓存标签与待测 SHA 完全一致。包装层只接受预期 Compose project，并对 runner、backend、frontend 注入 `NPM_OFFLINE=true`和对应缓存镜像。缓存缺失、角色错误或 SHA 不匹配都会在启动测试数据库前失败。
+
+XHSMedium 的初始化脚本会被 MySQL 官方 entrypoint `source`，其中的 `set -u`会继续影响官方脚本。平台从 fixed-SHA 仓库外附加一个极薄 wrapper，由它在独立 Bash 子进程执行原始初始化脚本；这样保留原始数据库名校验、schema 和 seed，同时避免 Shell option 泄漏。平台不修改 fixed-SHA Workspace、数据库结构或种子数据。
 
 依赖锁文件或待测 SHA 更新后必须先重新执行预加载。预加载只使用宿主机 Docker 客户端，不向 Agent 挂载 Docker Socket；临时源码快照和 tar 无论成功失败都会删除。
 

@@ -5,7 +5,13 @@ real_docker=/usr/local/bin/docker
 expected_project=${XHSMEDIUM_DOCKER_PROJECT:?XHSMEDIUM_DOCKER_PROJECT is required}
 cache_prefix=${XHSMEDIUM_DEPENDENCY_CACHE_PREFIX:?XHSMEDIUM_DEPENDENCY_CACHE_PREFIX is required}
 resolved_sha=${RESOLVED_SHA:?RESOLVED_SHA is required}
+compose_override=${XHSMEDIUM_COMPOSE_OVERRIDE_PATH:?XHSMEDIUM_COMPOSE_OVERRIDE_PATH is required}
 args=("$@")
+
+if [[ ! -f $compose_override ]]; then
+    printf 'Compose compatibility override is missing: %s\n' "$compose_override" >&2
+    exit 41
+fi
 
 if [[ ${args[0]:-} != compose ]]; then
     exec "$real_docker" "${args[@]}"
@@ -48,7 +54,7 @@ verify_cache_image() {
     fi
 }
 
-prefix=("${args[@]:0:$action_index}")
+prefix=("${args[@]:0:$action_index}" -f "$compose_override")
 action=${args[$action_index]}
 tail=("${args[@]:$((action_index + 1))}")
 
@@ -92,4 +98,4 @@ if [[ $action == up ]]; then
     fi
 fi
 
-exec "$real_docker" "${args[@]}"
+exec "$real_docker" "${prefix[@]}" "$action" "${tail[@]}"

@@ -1,0 +1,5 @@
+services:
+  mysql:
+    volumes:
+      - ${XHSMEDIUM_MYSQL_INIT_WRAPPER_PATH}:/docker-entrypoint-initdb.d/001-initialize-database.sh:ro
+      - ${XHSMEDIUM_ORIGINAL_MYSQL_INIT_PATH}:/automation/original-initialize-database.sh:ro
