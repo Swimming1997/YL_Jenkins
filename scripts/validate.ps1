@@ -68,7 +68,7 @@ try {
     Assert-True ($xhsmediumCi -match "agent \{ label 'xhsmedium-build' \}") 'XHSMedium CI is restricted to the Build Agent.'
     Assert-True ($xhsmediumCi -match 'disableConcurrentBuilds\(abortPrevious: true\)') 'XHSMedium CI replaces an overlapping build.'
     Assert-True ($xhsmediumCi -match "credentialsId: 'xhsmedium-scm-readonly'") 'XHSMedium CI uses only the fixed read-only SCM credential.'
-    Assert-True (([regex]::Matches($xhsmediumCi, "NODE_OPTIONS = '--max-old-space-size=768'")).Count -eq 2 -and ([regex]::Matches($xhsmediumCi, "NODE_OPTIONS = '--max-old-space-size=512'")).Count -eq 2) 'XHSMedium CI applies bounded per-module Node heap limits.'
+    Assert-True (([regex]::Matches($xhsmediumCi, "NODE_OPTIONS = '--max-old-space-size=768'")).Count -eq 1 -and ([regex]::Matches($xhsmediumCi, "NODE_OPTIONS = '--max-old-space-size=1536'")).Count -eq 1 -and ([regex]::Matches($xhsmediumCi, "NODE_OPTIONS = '--max-old-space-size=512'")).Count -eq 2) 'XHSMedium CI applies bounded per-module Node heap limits.'
     Assert-True ($xhsmediumCi -match 'GIT_ASKPASS_REQUIRE=force') 'XHSMedium branch resolution uses non-interactive Git credential handling.'
     Assert-True ($xhsmediumCi -match 'rm -f .*SCM_ASKPASS_PATH') 'XHSMedium CI explicitly cleans its temporary SCM AskPass wrapper.'
     Assert-True ($xhsmediumCi -match 'npm_config_cache = "/tmp/\$\{BUILD_TAG\}-npm-cache"' -and $xhsmediumCi -match 'rm -rf -- "\$npm_config_cache"') 'XHSMedium CI isolates and cleans its npm cache outside Workspace tmpfs.'
@@ -86,6 +86,7 @@ try {
     Assert-True ($controllerCompose -match '(?s)secrets:.*?- xhsmedium_scm_token') 'Controller receives the XHSMedium SCM Docker Secret.'
     Assert-True ($buildAgentCompose -notmatch 'xhsmedium_scm_token') 'Build Agent does not mount the XHSMedium SCM Docker Secret.'
     Assert-True ($buildAgentCompose -match '/home/jenkins/agent:size=2g,uid=1000,gid=1000,mode=0700,exec') 'Build Agent Workspace tmpfs explicitly permits CI tool execution.'
+    Assert-True ($buildAgentCompose -match 'mem_limit:\s*2g') 'Build Agent has the confirmed 2 GiB memory limit.'
 
     docker compose config --quiet
     Assert-True ($LASTEXITCODE -eq 0) 'Docker Compose configuration is valid.'
@@ -134,6 +135,7 @@ try {
         $regressionInspect = (docker inspect $serviceIds['regression-agent'] | ConvertFrom-Json)[0]
         $dindInspect = (docker inspect $serviceIds['regression-docker'] | ConvertFrom-Json)[0]
         Assert-True (-not @($buildInspect.NetworkSettings.Ports.PSObject.Properties | Where-Object Value).Count) 'Build Agent publishes no host port.'
+        Assert-True ([int64]$buildInspect.HostConfig.Memory -eq 2GB) 'Running Build Agent memory limit is 2 GiB.'
         $buildWorkspaceOptions = (docker exec $serviceIds['build-agent'] findmnt -no OPTIONS /home/jenkins/agent).Trim() -split ','
         Assert-True ($buildWorkspaceOptions -notcontains 'noexec') 'Running Build Agent Workspace permits CI tool execution.'
         Assert-True ($buildWorkspaceOptions -contains 'nosuid' -and $buildWorkspaceOptions -contains 'nodev') 'Running Build Agent Workspace retains nosuid and nodev isolation.'
