@@ -89,6 +89,8 @@ test \"\\$(docker image inspect --format '{{index .Config.Labels \\\"xhsmedium.p
                     writeFile(file: '.platform-bin/docker', text: libraryResource('xhsmedium/docker-offline-wrapper.sh'))
                     writeFile(file: '.mysql-entrypoint-compat.yaml', text: libraryResource('xhsmedium/mysql-entrypoint-compat.yaml'))
                     writeFile(file: '.mysql-init-wrapper.sh', text: libraryResource('xhsmedium/mysql-init-wrapper.sh'))
+                    env.XHSMEDIUM_RUNNER_UID = sh(returnStdout: true, script: 'id -u').trim()
+                    env.XHSMEDIUM_RUNNER_GID = sh(returnStdout: true, script: 'id -g').trim()
                     env.XHSMEDIUM_ORIGINAL_MYSQL_INIT_PATH = "${env.WORKSPACE}/automation/fixtures/initialize-database.sh"
                     def validationSlot = params.VALIDATION_SLOT_UTC?.trim()
                     def validationTimeout = params.VALIDATION_TIMEOUT_MINUTES?.trim()

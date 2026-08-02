@@ -3,3 +3,7 @@ services:
     volumes:
       - ${XHSMEDIUM_MYSQL_INIT_WRAPPER_PATH}:/docker-entrypoint-initdb.d/001-initialize-database.sh:ro
       - ${XHSMEDIUM_ORIGINAL_MYSQL_INIT_PATH}:/automation/original-initialize-database.sh:ro
+  runner:
+    user: "${XHSMEDIUM_RUNNER_UID:?XHSMEDIUM_RUNNER_UID is required}:${XHSMEDIUM_RUNNER_GID:?XHSMEDIUM_RUNNER_GID is required}"
+    environment:
+      HOME: /tmp

@@ -110,6 +110,8 @@ try {
     Assert-True ($offlineWrapper -notmatch '/var/run/docker\.sock') 'Offline Docker wrapper never references the host Docker Socket.'
     $mysqlCompatibility = Get-Content -Raw -LiteralPath 'shared-library\resources\xhsmedium\mysql-entrypoint-compat.yaml'
     Assert-True ($mysqlCompatibility -match 'XHSMEDIUM_MYSQL_INIT_WRAPPER_PATH' -and $mysqlCompatibility -match 'XHSMEDIUM_ORIGINAL_MYSQL_INIT_PATH') 'MySQL compatibility override mounts the wrapper and original fixed-SHA script separately.'
+    Assert-True ($mysqlCompatibility -match 'XHSMEDIUM_RUNNER_UID' -and $mysqlCompatibility -match 'XHSMEDIUM_RUNNER_GID' -and $mysqlCompatibility -match 'HOME:\s*/tmp') 'Compose compatibility override runs the bind-mounted test runner as the Jenkins Agent user.'
+    Assert-True ($xhsmediumRegression -match "XHSMEDIUM_RUNNER_UID = sh\(returnStdout: true, script: 'id -u'\)" -and $xhsmediumRegression -match "XHSMEDIUM_RUNNER_GID = sh\(returnStdout: true, script: 'id -g'\)") 'XHSMedium regression resolves the runner identity from the assigned Agent.'
     $mysqlInitWrapper = Get-Content -Raw -LiteralPath 'shared-library\resources\xhsmedium\mysql-init-wrapper.sh'
     Assert-True ($mysqlInitWrapper.Trim() -eq "#!/bin/sh`nbash /automation/original-initialize-database.sh") 'MySQL compatibility wrapper only executes the original script in a child shell.'
     $slotShim = Get-Content -Raw -LiteralPath 'shared-library\resources\xhsmedium\scheduled-slot-shim.cjs'
