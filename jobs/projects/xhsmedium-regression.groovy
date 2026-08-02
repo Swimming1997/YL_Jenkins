@@ -23,8 +23,6 @@ pipeline {
         npm_config_cache = "/tmp/${BUILD_TAG}-npm-cache"
         XHSMEDIUM_COMPOSE_OVERRIDE_PATH = "/tmp/${BUILD_TAG}-mysql-compat.yaml"
         XHSMEDIUM_MYSQL_INIT_WRAPPER_PATH = "/home/jenkins/agent/.platform-compat/${BUILD_TAG}-mysql-init-wrapper.sh"
-        XHSMEDIUM_VALIDATION_SLOT_UTC = ''
-        SCHEDULE_NODE_OPTIONS = ''
     }
     triggers { cron('0 */2 * * *') }
     options {
@@ -141,7 +139,7 @@ test \"\\$(docker image inspect --format '{{index .Config.Labels \\\"xhsmedium.p
                     '#!/usr/bin/env bash\\n' +
                     'set -euo pipefail\\n' +
                     'export PATH="$WORKSPACE/.platform-bin:$WORKSPACE/regression/worktrees/node_modules/.bin:$PATH"\\n' +
-                    'NODE_OPTIONS="$SCHEDULE_NODE_OPTIONS" node regression/src/scheduled-entry.js --branch "$REGRESSION_BRANCH" --build-number "$BUILD_NUMBER" 2>&1 | tee scheduled-regression.log\\n' +
+                    'NODE_OPTIONS="${SCHEDULE_NODE_OPTIONS:-}" node regression/src/scheduled-entry.js --branch "$REGRESSION_BRANCH" --build-number "$BUILD_NUMBER" 2>&1 | tee scheduled-regression.log\\n' +
                     'grep -q PASSED scheduled-regression.log\\n' +
                     'test -f "artifacts/test-runs/$EXPECTED_RUN_ID/summary.json"\\n' +
                     'grep -q runId "artifacts/test-runs/$EXPECTED_RUN_ID/summary.json"\\n' +
