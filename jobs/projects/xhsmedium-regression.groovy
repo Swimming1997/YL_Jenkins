@@ -23,6 +23,7 @@ pipeline {
         npm_config_cache = "/tmp/${BUILD_TAG}-npm-cache"
         XHSMEDIUM_COMPOSE_OVERRIDE_PATH = "/tmp/${BUILD_TAG}-mysql-compat.yaml"
         XHSMEDIUM_MYSQL_INIT_WRAPPER_PATH = "/home/jenkins/agent/.platform-compat/${BUILD_TAG}-mysql-init-wrapper.sh"
+        XHSMEDIUM_RUNNER_ENTRYPOINT_PATH = "/home/jenkins/agent/.platform-compat/${BUILD_TAG}-runner-entrypoint.sh"
     }
     triggers { cron('0 */2 * * *') }
     options {
@@ -89,6 +90,7 @@ test \"\\$(docker image inspect --format '{{index .Config.Labels \\\"xhsmedium.p
                     writeFile(file: '.platform-bin/docker', text: libraryResource('xhsmedium/docker-offline-wrapper.sh'))
                     writeFile(file: '.mysql-entrypoint-compat.yaml', text: libraryResource('xhsmedium/mysql-entrypoint-compat.yaml'))
                     writeFile(file: '.mysql-init-wrapper.sh', text: libraryResource('xhsmedium/mysql-init-wrapper.sh'))
+                    writeFile(file: '.runner-volume-entrypoint.sh', text: libraryResource('xhsmedium/runner-volume-entrypoint.sh'))
                     env.XHSMEDIUM_RUNNER_UID = sh(returnStdout: true, script: 'id -u').trim()
                     env.XHSMEDIUM_RUNNER_GID = sh(returnStdout: true, script: 'id -g').trim()
                     env.XHSMEDIUM_ORIGINAL_MYSQL_INIT_PATH = "${env.WORKSPACE}/automation/fixtures/initialize-database.sh"
@@ -114,9 +116,11 @@ test \"\\$(docker image inspect --format '{{index .Config.Labels \\\"xhsmedium.p
                     'install -m 600 .mysql-entrypoint-compat.yaml "$XHSMEDIUM_COMPOSE_OVERRIDE_PATH"\\n' +
                     'mkdir -p "$(dirname "$XHSMEDIUM_MYSQL_INIT_WRAPPER_PATH")"\\n' +
                     'install -m 644 .mysql-init-wrapper.sh "$XHSMEDIUM_MYSQL_INIT_WRAPPER_PATH"\\n' +
+                    'install -m 755 .runner-volume-entrypoint.sh "$XHSMEDIUM_RUNNER_ENTRYPOINT_PATH"\\n' +
                     'if test -f .scheduled-slot-shim.cjs; then install -m 600 .scheduled-slot-shim.cjs "$XHSMEDIUM_SLOT_SHIM_PATH"; rm -f .scheduled-slot-shim.cjs; fi\\n' +
                     'rm -f .mysql-entrypoint-compat.yaml\\n' +
                     'rm -f .mysql-init-wrapper.sh\\n' +
+                    'rm -f .runner-volume-entrypoint.sh\\n' +
                     'npm ci --prefix regression --no-audit --no-fund\\n' +
                     'mkdir -p regression/worktrees\\n' +
                     'cp automation/package.json automation/package-lock.json regression/worktrees/\\n' +
@@ -166,6 +170,7 @@ test \"\\$(docker image inspect --format '{{index .Config.Labels \\\"xhsmedium.p
                 'test -z "${SCM_ASKPASS_PATH:-}" || rm -f "$SCM_ASKPASS_PATH"\\n' +
                 'test -z "${XHSMEDIUM_COMPOSE_OVERRIDE_PATH:-}" || rm -f "$XHSMEDIUM_COMPOSE_OVERRIDE_PATH"\\n' +
                 'test -z "${XHSMEDIUM_MYSQL_INIT_WRAPPER_PATH:-}" || rm -f "$XHSMEDIUM_MYSQL_INIT_WRAPPER_PATH"\\n' +
+                'test -z "${XHSMEDIUM_RUNNER_ENTRYPOINT_PATH:-}" || rm -f "$XHSMEDIUM_RUNNER_ENTRYPOINT_PATH"\\n' +
                 'test -z "${XHSMEDIUM_SLOT_SHIM_PATH:-}" || rm -f "$XHSMEDIUM_SLOT_SHIM_PATH"\\n' +
                 'rmdir /home/jenkins/agent/.platform-compat 2>/dev/null || true\\n' +
                 'case "$npm_config_cache" in /tmp/jenkins-XHSMedium-Regression-scheduled-*-npm-cache) rm -rf -- "$npm_config_cache" ;; *) false ;; esac\\n'

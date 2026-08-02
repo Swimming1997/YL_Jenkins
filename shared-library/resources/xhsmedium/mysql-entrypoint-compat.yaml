@@ -4,6 +4,12 @@ services:
       - ${XHSMEDIUM_MYSQL_INIT_WRAPPER_PATH}:/docker-entrypoint-initdb.d/001-initialize-database.sh:ro
       - ${XHSMEDIUM_ORIGINAL_MYSQL_INIT_PATH}:/automation/original-initialize-database.sh:ro
   runner:
-    user: "${XHSMEDIUM_RUNNER_UID:?XHSMEDIUM_RUNNER_UID is required}:${XHSMEDIUM_RUNNER_GID:?XHSMEDIUM_RUNNER_GID is required}"
+    user: "0:0"
+    entrypoint:
+      - /opt/xhsmedium/runner-volume-entrypoint.sh
     environment:
       HOME: /tmp
+      XHSMEDIUM_RUNNER_UID: ${XHSMEDIUM_RUNNER_UID:?XHSMEDIUM_RUNNER_UID is required}
+      XHSMEDIUM_RUNNER_GID: ${XHSMEDIUM_RUNNER_GID:?XHSMEDIUM_RUNNER_GID is required}
+    volumes:
+      - ${XHSMEDIUM_RUNNER_ENTRYPOINT_PATH:?XHSMEDIUM_RUNNER_ENTRYPOINT_PATH is required}:/opt/xhsmedium/runner-volume-entrypoint.sh:ro
