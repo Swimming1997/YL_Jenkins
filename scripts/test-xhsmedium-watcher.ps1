@@ -63,20 +63,27 @@ try {
         Assert-True ($originalDescription -match '^SHA=[0-9a-f]{40}$') 'Watcher state contains a restorable observed SHA.'
         try {
             $syntheticOldSha = '0000000000000000000000000000000000000000'
-            $update = Invoke-WebRequest -UseBasicParsing -SkipHttpErrorCheck -Method Post -ContentType 'application/x-www-form-urlencoded' `
+            Invoke-WebRequest -UseBasicParsing -SkipHttpErrorCheck -Method Post -ContentType 'application/x-www-form-urlencoded' `
                 -Uri "$watcherUrl/$second/submitDescription" -Headers $postHeaders -WebSession $session `
-                -Body @{ description = "SHA=$syntheticOldSha" } -TimeoutSec 20
-            Assert-True ([int]$update.StatusCode -in @(200, 201, 302)) 'Synthetic previous SHA was installed for isolated trigger validation.'
+                -Body @{ description = "SHA=$syntheticOldSha"; Submit = 'Save' } -TimeoutSec 20 | Out-Null
+            $installedDescription = (Invoke-RestMethod "$watcherUrl/$second/api/json?tree=description" -Headers $headers -TimeoutSec 20).description
+            Assert-True ($installedDescription -eq "SHA=$syntheticOldSha") 'Synthetic previous SHA was installed for isolated trigger validation.'
             $triggeredBuild = [int](Invoke-RestMethod "$ciUrl/api/json?tree=nextBuildNumber" -Headers $headers -TimeoutSec 20).nextBuildNumber
             $third = Invoke-WatcherBuild -ExpectedMarker 'SCM_CHANGE_TRIGGERED'
-            $nextAfterTrigger = [int](Invoke-RestMethod "$ciUrl/api/json?tree=nextBuildNumber" -Headers $headers -TimeoutSec 20).nextBuildNumber
+            $triggerDeadline = (Get-Date).AddSeconds(30)
+            do {
+                $nextAfterTrigger = [int](Invoke-RestMethod "$ciUrl/api/json?tree=nextBuildNumber" -Headers $headers -TimeoutSec 20).nextBuildNumber
+                if ($nextAfterTrigger -eq ($triggeredBuild + 1)) { break }
+                Start-Sleep -Seconds 2
+            } while ((Get-Date) -lt $triggerDeadline)
             Assert-True ($nextAfterTrigger -eq ($triggeredBuild + 1)) "Changed SHA triggered full CI build $triggeredBuild exactly once."
         }
         finally {
-            $restore = Invoke-WebRequest -UseBasicParsing -SkipHttpErrorCheck -Method Post -ContentType 'application/x-www-form-urlencoded' `
+            Invoke-WebRequest -UseBasicParsing -SkipHttpErrorCheck -Method Post -ContentType 'application/x-www-form-urlencoded' `
                 -Uri "$watcherUrl/$second/submitDescription" -Headers $postHeaders -WebSession $session `
-                -Body @{ description = $originalDescription } -TimeoutSec 20
-            Assert-True ([int]$restore.StatusCode -in @(200, 201, 302)) 'Synthetic watcher history was restored.'
+                -Body @{ description = $originalDescription; Submit = 'Save' } -TimeoutSec 20 | Out-Null
+            $restoredDescription = (Invoke-RestMethod "$watcherUrl/$second/api/json?tree=description" -Headers $headers -TimeoutSec 20).description
+            Assert-True ($restoredDescription -eq $originalDescription) 'Synthetic watcher history was restored.'
         }
     }
 
