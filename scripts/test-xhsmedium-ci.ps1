@@ -3,7 +3,8 @@ param(
     [string]$BaseUrl = 'http://127.0.0.1:8080',
     [string]$Branch = 'dev',
     [string]$GitSha = '',
-    [int]$TimeoutMinutes = 45
+    [int]$TimeoutMinutes = 45,
+    [int]$ExistingBuildNumber = 0
 )
 
 $ErrorActionPreference = 'Stop'
@@ -28,11 +29,17 @@ $jobUrl = "$BaseUrl/job/XHSMedium/job/CI/job/read-only"
 Push-Location $repoRoot
 try {
     $job = Invoke-RestMethod -Uri "$jobUrl/api/json" -Headers $adminHeaders -TimeoutSec 20
-    $buildNumber = [int]$job.nextBuildNumber
-    $response = Invoke-WebRequest -UseBasicParsing -SkipHttpErrorCheck -Method Post -ContentType 'application/x-www-form-urlencoded' `
-        -Uri "$jobUrl/buildWithParameters" -Headers $buildHeaders -WebSession $jenkinsSession `
-        -Body @{ BRANCH = $Branch; GIT_SHA = $GitSha } -TimeoutSec 20
-    Assert-True ([int]$response.StatusCode -in @(200, 201, 202)) 'The read-only CI build was accepted.'
+    if ($ExistingBuildNumber -gt 0) {
+        $buildNumber = $ExistingBuildNumber
+        Write-Host "INFO: Revalidating existing XHSMedium CI build $buildNumber."
+    }
+    else {
+        $buildNumber = [int]$job.nextBuildNumber
+        $response = Invoke-WebRequest -UseBasicParsing -SkipHttpErrorCheck -Method Post -ContentType 'application/x-www-form-urlencoded' `
+            -Uri "$jobUrl/buildWithParameters" -Headers $buildHeaders -WebSession $jenkinsSession `
+            -Body @{ BRANCH = $Branch; GIT_SHA = $GitSha } -TimeoutSec 20
+        Assert-True ([int]$response.StatusCode -in @(200, 201, 202)) 'The read-only CI build was accepted.'
+    }
 
     $deadline = (Get-Date).AddMinutes($TimeoutMinutes)
     $build = $null
@@ -54,7 +61,7 @@ try {
     }
     Write-Host "PASS: XHSMedium CI build $buildNumber completed as SUCCESS."
 
-    Assert-True ($build.builtOn -eq 'build-agent') 'The project build ran on build-agent.'
+    Assert-True ($console -match 'Running on build-agent in ') 'The project build ran on build-agent.'
     Assert-True ($console -match 'RESOLVED_SHA=([0-9a-f]{40})') 'The build logged a full resolved SHA.'
     $resolvedSha = $Matches[1]
     if ($GitSha) {
