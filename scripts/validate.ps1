@@ -89,6 +89,7 @@ try {
     $xhsmediumRegression = Get-Content -Raw -LiteralPath 'jobs\projects\xhsmedium-regression.groovy'
     Assert-True (([regex]::Matches($xhsmediumRegression, "script\('''")).Count -eq 1 -and ([regex]::Matches($xhsmediumRegression, "'''\.stripIndent\(\)")).Count -eq 1 -and ([regex]::Matches($xhsmediumRegression, "'''")).Count -eq 2) 'XHSMedium regression Pipeline script has one isolated balanced boundary.'
     Assert-True (-not (($xhsmediumRegression -split "`r?`n") | Where-Object { $_ -match "(?<!\\)\\n'\s*\+?\s*$" })) 'Nested Pipeline shell strings preserve escaped newlines through Job DSL generation.'
+    Assert-True ($xhsmediumRegression.Contains('test \"\\$(docker') -and $xhsmediumRegression.Contains('\"\\$image\")')) 'Nested Pipeline GString preserves escaped Shell substitutions through Job DSL generation.'
     Assert-True ($xhsmediumRegression -match "pipelineJob\('XHSMedium/Regression/scheduled'\)") 'XHSMedium scheduled regression job has the expected fixed path.'
     Assert-True ($xhsmediumRegression -match "agent \{ label 'xhsmedium-regression' \}") 'XHSMedium regression is restricted to the Regression Agent.'
     Assert-True ($xhsmediumRegression -match "triggers \{ cron\('0 \*/2 \* \* \*'\) \}") 'XHSMedium regression runs at each even-hour slot.'

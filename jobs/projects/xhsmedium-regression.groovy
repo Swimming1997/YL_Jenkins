@@ -79,8 +79,8 @@ pipeline {
                     ['backend', 'frontend', 'runner'].each { role ->
                         sh """set -eu
 image='${env.XHSMEDIUM_DEPENDENCY_CACHE_PREFIX}-${role}:latest'
-test \"\$(docker image inspect --format '{{index .Config.Labels \\\"xhsmedium.preload.sha\\\"}}' \"\$image\")\" = '${env.RESOLVED_SHA}'
-test \"\$(docker image inspect --format '{{index .Config.Labels \\\"xhsmedium.preload.role\\\"}}' \"\$image\")\" = '${role}'
+test \"\\$(docker image inspect --format '{{index .Config.Labels \\\"xhsmedium.preload.sha\\\"}}' \"\\$image\")\" = '${env.RESOLVED_SHA}'
+test \"\\$(docker image inspect --format '{{index .Config.Labels \\\"xhsmedium.preload.role\\\"}}' \"\\$image\")\" = '${role}'
 """
                     }
                     sh 'mkdir -p .platform-bin'
