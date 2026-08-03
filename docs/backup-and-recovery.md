@@ -26,6 +26,14 @@ JCasC、Job DSL 和插件清单由 Git 保存，不依赖 Jenkins Home 备份。
 
 恢复脚本只允许写入不存在的新卷，拒绝覆盖已有卷。验证恢复实例时必须使用独立 Compose project、端口和卷；验证完成后删除对应容器、网络和测试卷。
 
+本地自动恢复演练：
+
+```powershell
+.\scripts\test-backup-restore.ps1 -ExpectedRegressionBuild 19
+```
+
+脚本在备份前创建唯一即时 RPO 探针，对归档计算 SHA-256，恢复至新卷并以随机 localhost 端口启动隔离 Controller；随后验证管理员认证、历史构建和探针，记录 RTO，最后精确删除演练容器、卷、探针和敏感归档。
+
 ## 云端补充要求
 
 - 备份加密、校验和及异地副本
@@ -33,4 +41,3 @@ JCasC、Job DSL 和插件清单由 Git 保存，不依赖 Jenkins Home 备份。
 - 定期自动备份与失败告警
 - 密钥系统独立备份
 - 在全新主机执行恢复演练并记录耗时
-

@@ -25,7 +25,7 @@ $watcherUrl = "$BaseUrl/job/XHSMedium/job/CI/job/watch-dev"
 $ciUrl = "$BaseUrl/job/XHSMedium/job/CI/job/read-only"
 
 function Invoke-WatcherBuild {
-    param([string]$ExpectedMarker = 'SCM_NO_CHANGE')
+    param([string[]]$ExpectedMarkers = @('SCM_NO_CHANGE'))
     $job = Invoke-RestMethod "$watcherUrl/api/json?tree=nextBuildNumber" -Headers $headers -TimeoutSec 20
     $number = [int]$job.nextBuildNumber
     $response = Invoke-WebRequest -UseBasicParsing -SkipHttpErrorCheck -Method Post -Uri "$watcherUrl/build" -Headers $postHeaders -WebSession $session -TimeoutSec 20
@@ -42,14 +42,28 @@ function Invoke-WatcherBuild {
     } while ((Get-Date) -lt $deadline)
     Assert-True ($null -ne $build -and -not $build.building -and $build.result -eq 'SUCCESS') "Watcher build $number completed successfully."
     $console = (Invoke-WebRequest -UseBasicParsing "$watcherUrl/$number/consoleText" -Headers $headers -TimeoutSec 20).Content
-    Assert-True ($console -match "$ExpectedMarker.*[0-9a-f]{40}") "Watcher build $number emitted $ExpectedMarker."
-    return $number
+    $matchedMarker = $ExpectedMarkers | Where-Object { $console -match "$_.*[0-9a-f]{40}" } | Select-Object -First 1
+    Assert-True ([bool]$matchedMarker) "Watcher build $number emitted one of: $($ExpectedMarkers -join ', ')."
+    return [pscustomobject]@{ Number = $number; Marker = $matchedMarker }
 }
 
 Push-Location $repoRoot
 try {
     $config = (Invoke-WebRequest -UseBasicParsing "$watcherUrl/config.xml" -Headers $headers -TimeoutSec 20).Content
     Assert-True ($config -match 'H \* \* \* \*') 'Watcher cron runs once per hour.'
+    $beforePrime = [int](Invoke-RestMethod "$ciUrl/api/json?tree=nextBuildNumber" -Headers $headers -TimeoutSec 20).nextBuildNumber
+    $prime = Invoke-WatcherBuild -ExpectedMarkers @('SCM_NO_CHANGE', 'SCM_CHANGE_TRIGGERED')
+    $convergenceBuild = 0
+    if ($prime.Marker -eq 'SCM_CHANGE_TRIGGERED') {
+        $convergenceBuild = $beforePrime
+        $triggerDeadline = (Get-Date).AddSeconds(30)
+        do {
+            $nextAfterConvergence = [int](Invoke-RestMethod "$ciUrl/api/json?tree=nextBuildNumber" -Headers $headers -TimeoutSec 20).nextBuildNumber
+            if ($nextAfterConvergence -eq ($convergenceBuild + 1)) { break }
+            Start-Sleep -Seconds 2
+        } while ((Get-Date) -lt $triggerDeadline)
+        Assert-True ($nextAfterConvergence -eq ($convergenceBuild + 1)) "Initial SHA convergence triggered full CI build $convergenceBuild exactly once."
+    }
     $before = [int](Invoke-RestMethod "$ciUrl/api/json?tree=nextBuildNumber" -Headers $headers -TimeoutSec 20).nextBuildNumber
     $first = Invoke-WatcherBuild
     $second = Invoke-WatcherBuild
@@ -58,18 +72,18 @@ try {
 
     $triggeredBuild = 0
     if ($TestChangeTrigger) {
-        $secondState = Invoke-RestMethod "$watcherUrl/$second/api/json?tree=description" -Headers $headers -TimeoutSec 20
+        $secondState = Invoke-RestMethod "$watcherUrl/$($second.Number)/api/json?tree=description" -Headers $headers -TimeoutSec 20
         $originalDescription = $secondState.description
         Assert-True ($originalDescription -match '^SHA=[0-9a-f]{40}$') 'Watcher state contains a restorable observed SHA.'
         try {
             $syntheticOldSha = '0000000000000000000000000000000000000000'
             Invoke-WebRequest -UseBasicParsing -SkipHttpErrorCheck -Method Post -ContentType 'application/x-www-form-urlencoded' `
-                -Uri "$watcherUrl/$second/submitDescription" -Headers $postHeaders -WebSession $session `
+                -Uri "$watcherUrl/$($second.Number)/submitDescription" -Headers $postHeaders -WebSession $session `
                 -Body @{ description = "SHA=$syntheticOldSha"; Submit = 'Save' } -TimeoutSec 20 | Out-Null
-            $installedDescription = (Invoke-RestMethod "$watcherUrl/$second/api/json?tree=description" -Headers $headers -TimeoutSec 20).description
+            $installedDescription = (Invoke-RestMethod "$watcherUrl/$($second.Number)/api/json?tree=description" -Headers $headers -TimeoutSec 20).description
             Assert-True ($installedDescription -eq "SHA=$syntheticOldSha") 'Synthetic previous SHA was installed for isolated trigger validation.'
             $triggeredBuild = [int](Invoke-RestMethod "$ciUrl/api/json?tree=nextBuildNumber" -Headers $headers -TimeoutSec 20).nextBuildNumber
-            $third = Invoke-WatcherBuild -ExpectedMarker 'SCM_CHANGE_TRIGGERED'
+            $third = Invoke-WatcherBuild -ExpectedMarkers @('SCM_CHANGE_TRIGGERED')
             $triggerDeadline = (Get-Date).AddSeconds(30)
             do {
                 $nextAfterTrigger = [int](Invoke-RestMethod "$ciUrl/api/json?tree=nextBuildNumber" -Headers $headers -TimeoutSec 20).nextBuildNumber
@@ -80,9 +94,9 @@ try {
         }
         finally {
             Invoke-WebRequest -UseBasicParsing -SkipHttpErrorCheck -Method Post -ContentType 'application/x-www-form-urlencoded' `
-                -Uri "$watcherUrl/$second/submitDescription" -Headers $postHeaders -WebSession $session `
+                -Uri "$watcherUrl/$($second.Number)/submitDescription" -Headers $postHeaders -WebSession $session `
                 -Body @{ description = $originalDescription; Submit = 'Save' } -TimeoutSec 20 | Out-Null
-            $restoredDescription = (Invoke-RestMethod "$watcherUrl/$second/api/json?tree=description" -Headers $headers -TimeoutSec 20).description
+            $restoredDescription = (Invoke-RestMethod "$watcherUrl/$($second.Number)/api/json?tree=description" -Headers $headers -TimeoutSec 20).description
             Assert-True ($restoredDescription -eq $originalDescription) 'Synthetic watcher history was restored.'
         }
     }
@@ -91,7 +105,7 @@ try {
     Assert-True (-not $workspaceFiles) 'Watcher Workspace contains no residual files.'
     $askpassFiles = docker compose exec --no-TTY build-agent sh -lc "find /tmp -maxdepth 1 -name 'jenkins-XHSMedium-CI-watch-dev-*-watch-git-askpass' -type f -print 2>/dev/null || true"
     Assert-True (-not $askpassFiles) 'Watcher AskPass wrappers were removed.'
-    Write-Host "P3B_WATCHER_EVIDENCE: unchanged_builds=$first,$second triggered_ci=$triggeredBuild downstream_next=$after"
+    Write-Host "P3B_WATCHER_EVIDENCE: prime=$($prime.Number):$($prime.Marker) convergence_ci=$convergenceBuild unchanged_builds=$($first.Number),$($second.Number) triggered_ci=$triggeredBuild downstream_next=$after"
     $global:LASTEXITCODE = 0
 }
 finally {

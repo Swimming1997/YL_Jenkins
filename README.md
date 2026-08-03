@@ -1,6 +1,6 @@
 # Jenkins Platform
 
-本仓库提供可重建的 Jenkins 平台。当前实现范围为 G0～P3A：在本地 Docker Desktop 中运行 Jenkins Controller、隔离 Build/Regression Agent 和专用 Docker-in-Docker，并通过 JCasC、Role Strategy 和 Job DSL 自动恢复平台配置；XHSMedium 已接入手工只读 CI 试点。
+本仓库提供可重建的 Jenkins 平台。当前实现范围为 G0～P4.5：在本地 Docker Desktop 中运行 Jenkins Controller、隔离 Build/Regression Agent 和专用 Docker-in-Docker，并通过 JCasC、Role Strategy 和 Job DSL 自动恢复平台配置；XHSMedium 已接入按新 SHA 触发的只读 CI 和每两小时离线定时回归，并完成首期加速加固验收。
 
 ## 当前基线
 
@@ -56,6 +56,7 @@ Get-Content .\.secrets\jenkins_admin_password
 .\scripts\test-agents.ps1
 .\scripts\test-xhsmedium-ci.ps1 -Branch dev
 .\scripts\test-xhsmedium-watcher.ps1
+.\scripts\test-hardening.ps1 -Cycles 3
 ```
 
 验证数据卷在容器重建后仍然保留数据：
@@ -113,6 +114,10 @@ docker compose down
 - `docs/configuration-as-code.md`：JCasC、Job DSL 与 Shared Library
 - `docs/authorization.md`：本地账户和角色权限
 - `docs/backup-and-recovery.md`：备份、恢复和演练
+- `docs/platform-hardening.md`：P4.5 加速稳定性与故障演练证据
+- `docs/operations.md`：平台日常运维与变更验收
+- `docs/incident-response.md`：Controller、Agent、回归与凭据故障响应
+- `docs/onboarding-project.md`：新项目接入门禁和验收要求
 - `docs/agents.md`：Agent 标签、连接和验证
 - `docs/docker-isolation.md`：专用 DIND 与清理边界
 - `docs/xhsmedium-ci.md`：XHSMedium 手工只读 CI、证据和安全边界

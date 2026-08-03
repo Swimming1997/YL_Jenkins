@@ -15,6 +15,7 @@ $adminHeaders = @{ Authorization = "Basic $pair" }
 $crumb = Invoke-RestMethod -Uri "$BaseUrl/crumbIssuer/api/json" -Headers $adminHeaders -SessionVariable jenkinsSession -TimeoutSec 20
 $buildHeaders = @{} + $adminHeaders
 $buildHeaders[$crumb.crumbRequestField] = $crumb.crumb
+$agentsStopped = $false
 
 function Invoke-ValidationJob {
     param(
@@ -64,6 +65,21 @@ function Wait-AgentsOnline {
     throw 'Agents did not become online within four minutes.'
 }
 
+function Wait-AgentsOffline {
+    $deadline = (Get-Date).AddMinutes(2)
+    do {
+        $nodes = Invoke-RestMethod -Uri "$BaseUrl/computer/api/json?tree=computer[displayName,offline]" -Headers $adminHeaders -TimeoutSec 20
+        $buildNode = $nodes.computer | Where-Object displayName -eq 'build-agent'
+        $regressionNode = $nodes.computer | Where-Object displayName -eq 'regression-agent'
+        if ($buildNode -and $regressionNode -and $buildNode.offline -and $regressionNode.offline) {
+            Write-Host 'PASS: Jenkins observed both Agents offline.'
+            return
+        }
+        Start-Sleep -Seconds 2
+    } while ((Get-Date) -lt $deadline)
+    throw 'Jenkins did not observe both Agents offline within two minutes.'
+}
+
 Push-Location $repoRoot
 try {
     Wait-AgentsOnline
@@ -81,8 +97,13 @@ try {
     Write-Host 'PASS: Timeout Docker network was removed by exact name.'
 
     if (-not $SkipReconnect) {
-        docker compose restart build-agent regression-agent
-        if ($LASTEXITCODE -ne 0) { throw 'Could not restart Agents.' }
+        docker compose stop build-agent regression-agent
+        if ($LASTEXITCODE -ne 0) { throw 'Could not stop Agents for the offline drill.' }
+        $agentsStopped = $true
+        Wait-AgentsOffline
+        docker compose start build-agent regression-agent
+        if ($LASTEXITCODE -ne 0) { throw 'Could not start Agents after the offline drill.' }
+        $agentsStopped = $false
         Wait-AgentsOnline
         Invoke-ValidationJob -Name 'agent-reconnect' -ExpectedResult 'SUCCESS' | Out-Null
     }
@@ -90,5 +111,6 @@ try {
     $global:LASTEXITCODE = 0
 }
 finally {
+    if ($agentsStopped) { docker compose start build-agent regression-agent | Out-Host }
     Pop-Location
 }
