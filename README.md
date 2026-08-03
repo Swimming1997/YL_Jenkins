@@ -9,6 +9,7 @@
 - 容器端口：`8080`，仅绑定宿主机 `127.0.0.1`
 - 数据目录：Docker named volume `jenkins_platform_home`
 - Agent：Linux Build Agent 与隔离 Regression Agent
+- Release：独立 Release Agent、TLS DIND 与 localhost 认证 Registry
 - 平台 Git 远端：`https://github.com/Swimming1997/YL_Jenkins.git`
 - 全局 Shared Library：`jenkins-platform-library`，默认版本 `main`
 
@@ -57,6 +58,7 @@ Get-Content .\.secrets\jenkins_admin_password
 .\scripts\test-xhsmedium-ci.ps1 -Branch dev
 .\scripts\test-xhsmedium-watcher.ps1
 .\scripts\test-hardening.ps1 -Cycles 3
+.\scripts\test-xhsmedium-release.ps1
 ```
 
 验证数据卷在容器重建后仍然保留数据：
@@ -105,7 +107,7 @@ docker compose down
 - 不向不可信 PR 提供发布、生产或高权限 Docker 凭据。
 - 不在仓库保存真实密码、Token、Cookie 或连接串。
 - 当前不调用 FTP、飞书、生产数据库或其他真实外部系统。
-- XHSMedium 仍处于安全冻结状态，不推送、不发布、不部署。
+- P5 仅向本地认证 Registry 写入已授权的 XHSMedium 候选镜像；不向公网发布、不部署业务，也不连接真实外部系统。
 
 ## 文档
 
@@ -118,6 +120,8 @@ docker compose down
 - `docs/operations.md`：平台日常运维与变更验收
 - `docs/incident-response.md`：Controller、Agent、回归与凭据故障响应
 - `docs/onboarding-project.md`：新项目接入门禁和验收要求
+- `docs/xhsmedium-release.md`：候选镜像、digest manifest 和 Release 准入
+- `docs/registry-cloud-deployment.md`：云服务器自建 Registry 的 TLS、备份和 Jenkins 切换
 - `docs/agents.md`：Agent 标签、连接和验证
 - `docs/docker-isolation.md`：专用 DIND 与清理边界
 - `docs/xhsmedium-ci.md`：XHSMedium 手工只读 CI、证据和安全边界

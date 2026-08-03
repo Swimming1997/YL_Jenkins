@@ -187,3 +187,32 @@ pipeline {
     }
     logRotator { numToKeep(10) }
 }
+
+pipelineJob('Platform/Validation/release-agent-smoke') {
+    description('Validates the dedicated Release Agent, TLS DIND, and authenticated local Registry without publishing an image.')
+    definition {
+        cps {
+            sandbox(true)
+            script('''
+pipeline {
+    agent { label 'xhsmedium-release' }
+    options { skipDefaultCheckout(true); timeout(time: 3, unit: 'MINUTES') }
+    environment { DOCKER_CONFIG = "${WORKSPACE}/.docker" }
+    stages {
+        stage('Release isolation') {
+            steps {
+                sh 'docker info >/dev/null && test ! -e /var/run/docker.sock && test "$LOCAL_REGISTRY" = registry:5000'
+                withCredentials([usernamePassword(credentialsId: 'registry-xhsmedium-push', usernameVariable: 'REGISTRY_USER', passwordVariable: 'REGISTRY_PASSWORD')]) {
+                    sh 'set +x; mkdir -p "$DOCKER_CONFIG"; printf "%s" "$REGISTRY_PASSWORD" | docker --config "$DOCKER_CONFIG" login "$LOCAL_REGISTRY" --username "$REGISTRY_USER" --password-stdin >/dev/null'
+                }
+                echo 'RELEASE_AGENT_OK'
+            }
+        }
+    }
+    post { always { sh 'docker --config "$DOCKER_CONFIG" logout "$LOCAL_REGISTRY" >/dev/null 2>&1 || true; rm -rf -- "$DOCKER_CONFIG"'; deleteDir() } }
+}
+'''.stripIndent())
+        }
+    }
+    logRotator { numToKeep(10) }
+}

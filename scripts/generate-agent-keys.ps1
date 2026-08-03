@@ -10,7 +10,7 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 $secretDirectory = Join-Path $repoRoot '.secrets'
 [System.IO.Directory]::CreateDirectory($secretDirectory) | Out-Null
 
-foreach ($name in @('build_agent_ssh_key', 'regression_agent_ssh_key')) {
+foreach ($name in @('build_agent_ssh_key', 'regression_agent_ssh_key', 'release_agent_ssh_key')) {
     $privatePath = Join-Path $secretDirectory $name
     $publicPath = "$privatePath.pub"
     if ((Test-Path -LiteralPath $privatePath) -and (Test-Path -LiteralPath $publicPath) -and -not $Force) {

@@ -27,6 +27,9 @@ try {
     git check-ignore --quiet .secrets/xhsmedium_scm_token
     Assert-True ($LASTEXITCODE -eq 0) 'XHSMedium SCM token is ignored by Git.'
     Assert-True ((Test-Path -LiteralPath '.secrets\xhsmedium_scm_token') -and (Get-Item -LiteralPath '.secrets\xhsmedium_scm_token').Length -gt 1) 'XHSMedium SCM token Secret exists and is non-empty.'
+    git check-ignore --quiet .secrets/registry_password
+    Assert-True ($LASTEXITCODE -eq 0) 'Registry credentials are ignored by Git.'
+    Assert-True ((Test-Path -LiteralPath '.secrets\registry_username') -and (Get-Item -LiteralPath '.secrets\registry_username').Length -gt 1 -and (Test-Path -LiteralPath '.secrets\registry_password') -and (Get-Item -LiteralPath '.secrets\registry_password').Length -gt 15) 'Local Registry credentials exist and are non-empty.'
 
     $dockerfile = Get-Content -Raw -LiteralPath 'controller\Dockerfile'
     Assert-True ($dockerfile -match 'jenkins/jenkins:2\.568\.1-jdk21@sha256:[0-9a-f]{64}') 'Jenkins numeric LTS tag and digest are pinned.'
@@ -45,7 +48,7 @@ try {
         Assert-True ($pluginNames -contains $required) "Required plugin '$required' is locked."
     }
 
-    foreach ($configFile in @('jcasc\jenkins.yaml', 'jcasc\security.yaml', 'jcasc\authorization.yaml', 'jcasc\jobs.yaml', 'jcasc\agents.yaml', 'jcasc\credentials.yaml', 'jobs\folders.groovy', 'jobs\seed.groovy', 'jobs\projects\xhsmedium-ci.groovy', 'jobs\projects\xhsmedium-regression.groovy', 'shared-library\vars\validateGitRef.groovy', 'shared-library\vars\nodeModuleCi.groovy', 'shared-library\vars\recordBuildMetadata.groovy', 'shared-library\vars\scmChangeDecision.groovy', 'shared-library\resources\xhsmedium\docker-offline-wrapper.sh', 'shared-library\resources\xhsmedium\mysql-entrypoint-compat.yaml', 'shared-library\resources\xhsmedium\mysql-init-wrapper.sh', 'shared-library\resources\xhsmedium\scheduled-slot-shim.cjs', 'shared-library\resources\xhsmedium\runner-volume-entrypoint.sh', 'shared-library\resources\xhsmedium\docker-project-cleanup.sh', 'scripts\preload-xhsmedium-regression.ps1', 'scripts\test-xhsmedium-regression.ps1', 'scripts\test-xhsmedium-regression-resilience.ps1', 'scripts\test-xhsmedium-watcher.ps1', 'scripts\test-backup-restore.ps1', 'scripts\test-disk-pressure.ps1', 'scripts\test-retention.ps1', 'scripts\test-hardening.ps1', 'docs\platform-hardening.md', 'docs\operations.md', 'docs\incident-response.md', 'docs\onboarding-project.md', 'agents\build\Dockerfile', 'agents\regression\Dockerfile')) {
+    foreach ($configFile in @('jcasc\jenkins.yaml', 'jcasc\security.yaml', 'jcasc\authorization.yaml', 'jcasc\jobs.yaml', 'jcasc\agents.yaml', 'jcasc\credentials.yaml', 'jobs\folders.groovy', 'jobs\seed.groovy', 'jobs\projects\xhsmedium-ci.groovy', 'jobs\projects\xhsmedium-regression.groovy', 'jobs\projects\xhsmedium-release.groovy', 'shared-library\vars\validateGitRef.groovy', 'shared-library\vars\nodeModuleCi.groovy', 'shared-library\vars\recordBuildMetadata.groovy', 'shared-library\vars\scmChangeDecision.groovy', 'shared-library\resources\xhsmedium\docker-offline-wrapper.sh', 'shared-library\resources\xhsmedium\mysql-entrypoint-compat.yaml', 'shared-library\resources\xhsmedium\mysql-init-wrapper.sh', 'shared-library\resources\xhsmedium\scheduled-slot-shim.cjs', 'shared-library\resources\xhsmedium\runner-volume-entrypoint.sh', 'shared-library\resources\xhsmedium\docker-project-cleanup.sh', 'scripts\preload-xhsmedium-regression.ps1', 'scripts\test-xhsmedium-regression.ps1', 'scripts\test-xhsmedium-regression-resilience.ps1', 'scripts\test-xhsmedium-watcher.ps1', 'scripts\test-xhsmedium-release.ps1', 'scripts\test-backup-restore.ps1', 'scripts\test-disk-pressure.ps1', 'scripts\test-retention.ps1', 'scripts\test-hardening.ps1', 'docs\platform-hardening.md', 'docs\operations.md', 'docs\incident-response.md', 'docs\onboarding-project.md', 'docs\xhsmedium-release.md', 'docs\registry-cloud-deployment.md', 'agents\build\Dockerfile', 'agents\regression\Dockerfile', 'agents\release\Dockerfile', 'agents\release\entrypoint.sh')) {
         Assert-True (Test-Path -LiteralPath $configFile) "Configuration file '$configFile' exists."
     }
 
@@ -56,6 +59,8 @@ try {
     $credentialsConfig = Get-Content -Raw -LiteralPath 'jcasc\credentials.yaml'
     Assert-True ($credentialsConfig -match 'id:\s*"xhsmedium-scm-readonly"') 'XHSMedium read-only SCM credential has a fixed Jenkins ID.'
     Assert-True ($credentialsConfig -match '\$\{trim:\$\{readFile:/run/secrets/xhsmedium_scm_token\}\}') 'XHSMedium SCM credential uses Docker Secret file interpolation.'
+    Assert-True ($credentialsConfig -match 'id:\s*"registry-xhsmedium-push"' -and $credentialsConfig -match '\$\{trim:\$\{readFile:/run/secrets/registry_password\}\}') 'Authenticated local Registry credential uses Docker Secret interpolation.'
+    Assert-True ($credentialsConfig -match 'id:\s*"jenkins-audit-api"' -and $credentialsConfig -match 'username:\s*"audit"') 'Release gates use a fixed read-only Jenkins API credential.'
 
     $jenkinsConfig = Get-Content -Raw -LiteralPath 'jcasc\jenkins.yaml'
     Assert-True ($jenkinsConfig -match 'numExecutors:\s*0') 'Controller executor count is configured as zero.'
@@ -66,6 +71,7 @@ try {
     Assert-True ($libraryConfig -match 'libraryPath:\s*"shared-library"') 'SCM Shared Library path is configured.'
     Assert-True ($libraryConfig -match 'job-dsl/projects/xhsmedium-ci\.groovy') 'XHSMedium read-only CI Job DSL is loaded by JCasC.'
     Assert-True ($libraryConfig -match 'job-dsl/projects/xhsmedium-regression\.groovy') 'XHSMedium scheduled regression Job DSL is loaded by JCasC.'
+    Assert-True ($libraryConfig -match 'job-dsl/projects/xhsmedium-release\.groovy') 'XHSMedium Release Job DSL is loaded by JCasC.'
 
     $xhsmediumCi = Get-Content -Raw -LiteralPath 'jobs\projects\xhsmedium-ci.groovy'
     Assert-True (([regex]::Matches($xhsmediumCi, "script\('''")).Count -eq 2 -and ([regex]::Matches($xhsmediumCi, "'''\.stripIndent\(\)")).Count -eq 2) 'Each XHSMedium Job DSL Pipeline script has an independent balanced boundary.'
@@ -104,6 +110,19 @@ try {
     Assert-True ($xhsmediumRegression -match 'substring\(11, 19\)' -and $xhsmediumRegression -match '%Y%m%d-%H%M00') 'Expected Compose project preserves the scheduler HHmmss runId format.'
     Assert-True ($xhsmediumRegression -notmatch '(?i)ftp://|feishu|aliyun|ossutil|/var/run/docker\.sock') 'XHSMedium regression contains no external delivery or host Docker Socket operation.'
 
+    $xhsmediumRelease = Get-Content -Raw -LiteralPath 'jobs\projects\xhsmedium-release.groovy'
+    Assert-True (([regex]::Matches($xhsmediumRelease, "pipelineJob\('XHSMedium/Release/(?:candidate|approve)'\)")).Count -eq 2) 'XHSMedium Release creates only candidate and approval Jobs.'
+    Assert-True (-not (($xhsmediumRelease -split "`r?`n") | Where-Object { $_ -match "(?<!\\)\\n'\s*\+?\s*$" })) 'Nested Release Pipeline shell strings preserve escaped newlines through Job DSL generation.'
+    Assert-True (([regex]::Matches($xhsmediumRelease, "agent \{ label 'xhsmedium-release' \}")).Count -eq 2) 'Release Jobs run only on the dedicated Release Agent.'
+    Assert-True ($xhsmediumRelease -match 'GIT_SHA is required for a Release candidate' -and $xhsmediumRelease -match 'CI_BUILD_NUMBER' -and $xhsmediumRelease -match 'REGRESSION_BUILD_NUMBER') 'Candidate build requires fixed SHA CI and regression gates.'
+    Assert-True ($xhsmediumRelease -match 'IMMUTABLE_TAG_EXISTS' -and $xhsmediumRelease -match 'git-\$\{env\.RESOLVED_SHA\}' -and $xhsmediumRelease -notmatch 'xhsmedium/(?:backend|frontend):latest') 'Candidate tags are full-SHA immutable tags and never latest.'
+    Assert-True ($xhsmediumRelease -match "stringParam\('RECOVER_FROM_FAILED_BUILD'" -and $xhsmediumRelease -match 'assert b.*FAILURE' -and $xhsmediumRelease -match 'RECOVERY_TAG_SET_INCOMPLETE') 'Candidate recovery audits one failed build and requires both immutable tags.'
+    Assert-True ($xhsmediumRelease -match "stage\('Build and push once'\)\s*\{\s*when \{ expression \{ env\.RECOVERY_MODE != 'true' \} \}" -and $xhsmediumRelease -match "stage\('Recover existing immutable images'\)\s*\{\s*when \{ expression \{ env\.RECOVERY_MODE == 'true' \} \}" -and $xhsmediumRelease -match 'org\.opencontainers\.image\.source' -and $xhsmediumRelease -match 'P5_CANDIDATE_RECOVERED') 'Recovery and build paths are mutually exclusive and recovered OCI metadata is verified.'
+    Assert-True ($xhsmediumRelease -match 'candidate-manifest\.json' -and $xhsmediumRelease -match 'approved-release-manifest\.json' -and $xhsmediumRelease -match '@\$\{env\.(?:BACKEND|FRONTEND)_DIGEST\}') 'Release manifests preserve immutable Registry digests.'
+    $approvalDsl = $xhsmediumRelease.Substring($xhsmediumRelease.IndexOf("pipelineJob('XHSMedium/Release/approve')"))
+    Assert-True ($approvalDsl -notmatch 'docker build(?:x)?\s+(?:build|--pull)' -and $approvalDsl -match 'docker --config.*pull.*BACKEND_REFERENCE' -and $approvalDsl -match 'org\.opencontainers\.image\.revision') 'Release approval pulls existing digests with scoped credentials, verifies their SHA labels, and never rebuilds.'
+    Assert-True ($xhsmediumRelease -notmatch '(?i)ftp://|feishu|aliyun|ossutil|/var/run/docker\.sock|\bdocker\s+compose\s+up\b|\bkubectl\b|\bssh\s+') 'P5 Release Jobs do not deploy, notify externally, or use the host Docker Socket.'
+
     $offlineWrapper = Get-Content -Raw -LiteralPath 'shared-library\resources\xhsmedium\docker-offline-wrapper.sh'
     Assert-True ($offlineWrapper -match 'xhsmedium\.preload\.sha' -and $offlineWrapper -match 'xhsmedium\.preload\.role') 'Offline Docker wrapper verifies full SHA and role labels.'
     Assert-True ($offlineWrapper -match 'OFFLINE_DEPENDENCY_CACHE' -and $offlineWrapper -match 'NPM_OFFLINE=true' -and $offlineWrapper -match 'tee -a "\$evidence_path"') 'Offline Docker wrapper persists and enforces cache use.'
@@ -132,16 +151,22 @@ try {
     $controllerCompose = [regex]::Match($composeText, '(?ms)^  controller:.*?(?=^  build-agent:)').Value
     $buildAgentCompose = [regex]::Match($composeText, '(?ms)^  build-agent:.*?(?=^  regression-agent:)').Value
     Assert-True ($composeText -notmatch '/var/run/docker\.sock') 'Host Docker Socket is not referenced.'
-    Assert-True (([regex]::Matches($composeText, '(?m)^\s+privileged:\s+true\s*$')).Count -eq 1) 'Exactly one service, isolated DIND, is privileged.'
+    Assert-True (([regex]::Matches($composeText, '(?m)^\s+privileged:\s+true\s*$')).Count -eq 2) 'Exactly two isolated DIND services are privileged.'
     Assert-True ($composeText -match '(?s)build-agent:.*?networks:\s*\r?\n\s*- control') 'Build Agent is attached to the control network.'
     Assert-True ($composeText -match '(?s)regression-agent:.*?regression_docker') 'Regression Agent is attached to the isolated Docker network.'
     Assert-True (([regex]::Matches($composeText, 'regression_workspace:/home/jenkins/agent')).Count -eq 2) 'Regression Agent and DIND share the exact remote Workspace path.'
     Assert-True ($controllerCompose -match '(?s)secrets:.*?- xhsmedium_scm_token') 'Controller receives the XHSMedium SCM Docker Secret.'
+    Assert-True ($controllerCompose -match '(?s)secrets:.*?- registry_username.*?- registry_password') 'Controller receives local Registry credentials through Docker Secrets.'
     Assert-True ($buildAgentCompose -notmatch 'xhsmedium_scm_token') 'Build Agent does not mount the XHSMedium SCM Docker Secret.'
     Assert-True ($buildAgentCompose -match '/home/jenkins/agent:size=2g,uid=1000,gid=1000,mode=0700,exec') 'Build Agent Workspace tmpfs explicitly permits CI tool execution.'
     Assert-True ($buildAgentCompose -match 'mem_limit:\s*2g') 'Build Agent has the confirmed 2 GiB memory limit.'
+    Assert-True ($composeText -match '(?s)release-agent:.*?DOCKER_HOST:\s*tcp://release-docker:2376.*?tmpfs:.*?/home/jenkins/agent:size=4g' -and $composeText -match '(?s)release-docker:.*?--insecure-registry=registry:5000') 'Release Agent uses only its dedicated TLS DIND and local Registry endpoint.'
+    Assert-True ($composeText -match 'registry:2\.8\.3@sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373' -and $composeText -match 'REGISTRY_STORAGE_DELETE_ENABLED:\s*"false"' -and $composeText -match '127\.0\.0\.1:\$\{REGISTRY_HTTP_PORT:-5000\}:5000') 'Local Registry is pinned, deletion-disabled, authenticated, and localhost-bound.'
+    $releaseAgentDockerfile = Get-Content -Raw -LiteralPath 'agents\release\Dockerfile'
+    Assert-True ($releaseAgentDockerfile -match 'docker:29\.3\.1-dind@sha256:686d2c' -and $releaseAgentDockerfile -match 'docker buildx version') 'Release Agent image pins and verifies its Docker toolchain.'
     $seedJobs = Get-Content -Raw -LiteralPath 'jobs\seed.groovy'
     Assert-True ($seedJobs -match 'python3 --version && make --version && g\+\+ --version') 'Build Agent smoke verifies the native Node.js build toolchain.'
+    Assert-True ($seedJobs -match "pipelineJob\('Platform/Validation/release-agent-smoke'\)" -and $seedJobs -match 'RELEASE_AGENT_OK') 'Release Agent smoke verifies TLS DIND and authenticated Registry access.'
 
     docker compose config --quiet
     Assert-True ($LASTEXITCODE -eq 0) 'Docker Compose configuration is valid.'
@@ -178,7 +203,7 @@ try {
         Assert-True ([int]$computer.numExecutors -eq 0) 'Running Controller executor count is zero.'
 
         $serviceIds = @{}
-        foreach ($service in @('build-agent', 'regression-agent', 'regression-docker')) {
+        foreach ($service in @('build-agent', 'regression-agent', 'regression-docker', 'release-agent', 'release-docker', 'registry')) {
             $serviceId = (docker compose ps --quiet $service).Trim()
             Assert-True ([bool]$serviceId) "Service '$service' exists."
             $serviceHealth = (docker inspect --format '{{.State.Health.Status}}' $serviceId).Trim()
@@ -189,6 +214,9 @@ try {
         $buildInspect = (docker inspect $serviceIds['build-agent'] | ConvertFrom-Json)[0]
         $regressionInspect = (docker inspect $serviceIds['regression-agent'] | ConvertFrom-Json)[0]
         $dindInspect = (docker inspect $serviceIds['regression-docker'] | ConvertFrom-Json)[0]
+        $releaseInspect = (docker inspect $serviceIds['release-agent'] | ConvertFrom-Json)[0]
+        $releaseDindInspect = (docker inspect $serviceIds['release-docker'] | ConvertFrom-Json)[0]
+        $registryInspect = (docker inspect $serviceIds['registry'] | ConvertFrom-Json)[0]
         Assert-True (-not @($buildInspect.NetworkSettings.Ports.PSObject.Properties | Where-Object Value).Count) 'Build Agent publishes no host port.'
         Assert-True ([int64]$buildInspect.HostConfig.Memory -eq 2GB) 'Running Build Agent memory limit is 2 GiB.'
         $buildWorkspaceOptions = (docker exec $serviceIds['build-agent'] findmnt -no OPTIONS /home/jenkins/agent).Trim() -split ','
@@ -201,7 +229,13 @@ try {
         Assert-True ($regressionWorkspaceMount.Count -eq 1 -and $dindWorkspaceMount.Count -eq 1 -and $regressionWorkspaceMount[0].Type -eq 'volume' -and $regressionWorkspaceMount[0].Name -eq $dindWorkspaceMount[0].Name) 'Running Regression Agent and DIND use the same named Workspace volume.'
         $regressionWorkspaceIdentity = (docker exec $serviceIds['regression-agent'] stat -c '%u:%g:%a' /home/jenkins/agent).Trim()
         Assert-True ($regressionWorkspaceIdentity -eq '1002:1002:700') 'Running Regression Workspace is private to the Jenkins Agent user.'
-        $socketMounts = @($buildInspect, $regressionInspect, $dindInspect | ForEach-Object { $_.Mounts } | Where-Object { $_.Source -match 'docker\.sock' })
+        Assert-True (-not @($releaseInspect.NetworkSettings.Ports.PSObject.Properties | Where-Object Value).Count) 'Release Agent publishes no host port.'
+        Assert-True ($releaseDindInspect.HostConfig.Privileged) 'Release DIND is privileged and isolated from the host daemon.'
+        $releaseEnvironment = $releaseInspect.Config.Env -join "`n"
+        Assert-True ($releaseEnvironment -notmatch '(?im)(PASSWORD|TOKEN|SECRET)=') 'Release Agent environment contains no persistent credential value.'
+        $registryPort = @($registryInspect.NetworkSettings.Ports.'5000/tcp')[0].HostIp
+        Assert-True ($registryPort -eq '127.0.0.1') 'Local Registry publishes only on localhost.'
+        $socketMounts = @($buildInspect, $regressionInspect, $dindInspect, $releaseInspect, $releaseDindInspect | ForEach-Object { $_.Mounts } | Where-Object { $_.Source -match 'docker\.sock' })
         Assert-True ($socketMounts.Count -eq 0) 'Agent services do not mount the host Docker Socket.'
     }
 

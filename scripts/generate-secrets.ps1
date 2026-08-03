@@ -27,3 +27,14 @@ foreach ($name in @('jenkins_admin_password', 'jenkins_audit_password')) {
     Write-Host "Generated secret: $name"
 }
 
+$registryUsernamePath = Join-Path $secretDirectory 'registry_username'
+if (-not (Test-Path -LiteralPath $registryUsernamePath) -or $Force) {
+    [System.IO.File]::WriteAllText($registryUsernamePath, 'jenkins-release', [System.Text.UTF8Encoding]::new($false))
+    Write-Host 'Generated secret: registry_username'
+}
+
+$registryPasswordPath = Join-Path $secretDirectory 'registry_password'
+if (-not (Test-Path -LiteralPath $registryPasswordPath) -or $Force) {
+    [System.IO.File]::WriteAllText($registryPasswordPath, (New-RandomSecret), [System.Text.UTF8Encoding]::new($false))
+    Write-Host 'Generated secret: registry_password'
+}

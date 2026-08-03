@@ -56,8 +56,9 @@ function Wait-AgentsOnline {
         $nodes = Invoke-RestMethod -Uri "$BaseUrl/computer/api/json?tree=computer[displayName,offline]" -Headers $adminHeaders -TimeoutSec 20
         $buildNode = $nodes.computer | Where-Object displayName -eq 'build-agent'
         $regressionNode = $nodes.computer | Where-Object displayName -eq 'regression-agent'
-        if ($buildNode -and $regressionNode -and -not $buildNode.offline -and -not $regressionNode.offline) {
-            Write-Host 'PASS: Build and Regression Agents are online.'
+        $releaseNode = $nodes.computer | Where-Object displayName -eq 'release-agent'
+        if ($buildNode -and $regressionNode -and $releaseNode -and -not $buildNode.offline -and -not $regressionNode.offline -and -not $releaseNode.offline) {
+            Write-Host 'PASS: Build, Regression, and Release Agents are online.'
             return
         }
         Start-Sleep -Seconds 5
@@ -71,8 +72,9 @@ function Wait-AgentsOffline {
         $nodes = Invoke-RestMethod -Uri "$BaseUrl/computer/api/json?tree=computer[displayName,offline]" -Headers $adminHeaders -TimeoutSec 20
         $buildNode = $nodes.computer | Where-Object displayName -eq 'build-agent'
         $regressionNode = $nodes.computer | Where-Object displayName -eq 'regression-agent'
-        if ($buildNode -and $regressionNode -and $buildNode.offline -and $regressionNode.offline) {
-            Write-Host 'PASS: Jenkins observed both Agents offline.'
+        $releaseNode = $nodes.computer | Where-Object displayName -eq 'release-agent'
+        if ($buildNode -and $regressionNode -and $releaseNode -and $buildNode.offline -and $regressionNode.offline -and $releaseNode.offline) {
+            Write-Host 'PASS: Jenkins observed all three Agents offline.'
             return
         }
         Start-Sleep -Seconds 2
@@ -85,6 +87,7 @@ try {
     Wait-AgentsOnline
     Invoke-ValidationJob -Name 'build-agent-smoke' -ExpectedResult 'SUCCESS' -Marker 'BUILD_AGENT_OK' | Out-Null
     Invoke-ValidationJob -Name 'regression-agent-smoke' -ExpectedResult 'SUCCESS' -Marker 'REGRESSION_AGENT_OK' | Out-Null
+    Invoke-ValidationJob -Name 'release-agent-smoke' -ExpectedResult 'SUCCESS' -Marker 'RELEASE_AGENT_OK' | Out-Null
     Invoke-ValidationJob -Name 'workspace-cleanup' -ExpectedResult 'SUCCESS' -Marker 'WORKSPACE_MARKER_CREATED' | Out-Null
 
     $workspaceResidue = docker compose exec --no-TTY build-agent sh -lc 'find /home/jenkins/agent -name marker.txt -print'
@@ -97,11 +100,11 @@ try {
     Write-Host 'PASS: Timeout Docker network was removed by exact name.'
 
     if (-not $SkipReconnect) {
-        docker compose stop build-agent regression-agent
+        docker compose stop build-agent regression-agent release-agent
         if ($LASTEXITCODE -ne 0) { throw 'Could not stop Agents for the offline drill.' }
         $agentsStopped = $true
         Wait-AgentsOffline
-        docker compose start build-agent regression-agent
+        docker compose start build-agent regression-agent release-agent
         if ($LASTEXITCODE -ne 0) { throw 'Could not start Agents after the offline drill.' }
         $agentsStopped = $false
         Wait-AgentsOnline
@@ -111,6 +114,6 @@ try {
     $global:LASTEXITCODE = 0
 }
 finally {
-    if ($agentsStopped) { docker compose start build-agent regression-agent | Out-Host }
+    if ($agentsStopped) { docker compose start build-agent regression-agent release-agent | Out-Host }
     Pop-Location
 }
