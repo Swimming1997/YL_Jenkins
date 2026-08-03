@@ -22,10 +22,12 @@ XHSMedium Dockerfile 的 `dependencies` target 先在宿主机 Docker 中按固�
 ```powershell
 .\scripts\preload-xhsmedium-regression.ps1 `
   -SourcePath ..\xhsmedium-reference `
-  -Sha 208d36fb42dda939184cbec2f1f829c8480c4d5f
+  -Sha b846dcd0771f3fdb81db9ae9c0e9f034d532d36e
 ```
 
 Jenkins 运行时要求缓存标签与待测 SHA 完全一致。包装层只接受预期 Compose project，并对 runner、backend、frontend 注入 `NPM_OFFLINE=true`和对应缓存镜像。缓存缺失、角色错误或 SHA 不匹配都会在启动测试数据库前失败。
+
+每次回归还会归档 `offline-dependency-cache.log`，分别记录 runner 与 backend/frontend 实际使用的完整固定 SHA。验收脚本直接检查该 Artifact，不依赖顶层 Console 是否转发项目执行器捕获的镜像构建输出。
 
 runner 镜像内的三个 `node_modules`会被 Compose 命名卷覆盖。每个 project 首次启动 runner 时，平台入口脚本先确认 backend、frontend、automation 三个路径都是独立 mountpoint，只初始化这些卷的属主，然后使用 `setpriv`降权到 Regression Agent 的动态 UID/GID 再执行 sealed plan 原命令。入口脚本不以 root 身份运行项目测试，也不修改 fixed-SHA worktree。
 
@@ -46,9 +48,13 @@ automation 自身的 `clean`完成后，Jenkins post 仍会对固定 Compose pro
   -InterruptionBuildNumber 12
 ```
 
-当前证据：构建 9 正确记录业务测试失败且 cleanup succeeded；构建 10 因验证超时为 `ABORTED`；构建 12 由管理员中断为 `ABORTED`，并在出现 one-off 创建竞态后由精确 helper 收敛到零残留。三者均未输出成功 marker，Workspace、npm cache 和兼容脚本也已清零。
+当前韧性证据：构建 9 正确记录业务测试失败且 cleanup succeeded；构建 10 因验证超时为 `ABORTED`；构建 12 由管理员中断为 `ABORTED`，并在出现 one-off 创建竞态后由精确 helper 收敛到零残留。三者均未输出成功 marker，Workspace、npm cache 和兼容脚本也已清零。
 
-P4 仍处于进行中。固定 SHA `208d36fb42dda939184cbec2f1f829c8480c4d5f`的构建 9 中，除 `leads-cross-role`外所有阶段均通过；剩余首个失败是同一测试文件连续两次 `POST /leads`触发应用一秒防抖而返回 429。需要 XHSMedium 新 SHA 修复测试节奏后，重新预加载并取得真实 PASSED 与 TimerTriggerCause 证据。
+## P4 完成证据
+
+构建 19 对固定 SHA `b846dcd0771f3fdb81db9ae9c0e9f034d532d36e`完成真实离线回归，Jenkins 结果为 `SUCCESS`，runId 为 `scheduled-20260803-040000-b846dcd0`。11 个 Stage 全部 `PASSED`，Requirement 为 2 covered、0 partial、0 blocked，`firstFailure=null`，automation 用时 161859 ms，cleanup succeeded；Jenkins 总用时 274281 ms。归档的 `offline-dependency-cache.log`同时证明 runner、backend、frontend 使用该完整 SHA 的预加载缓存。官方验收确认精确 Compose project、Workspace、npm cache、MySQL 兼容脚本、runner 入口脚本和 cleanup helper 均无残留。
+
+构建 13、14、15、16 分别在 UTC 20:00、22:00、00:00、02:00 由 `hudson.triggers.TimerTrigger$TimerTriggerCause`启动，证明 `0 */2 * * *`每两小时真实触发。TimerTriggerCause 与构建 19 的真实 PASSED 共同完成定时触发和业务成功验收。
 
 ## 安全边界
 
