@@ -61,6 +61,7 @@ pipeline {
                     }
                     env.RESOLVED_SHA = validateGitRef(branch: env.REGRESSION_BRANCH, sha: env.RESOLVED_SHA).sha
                     env.XHSMEDIUM_DEPENDENCY_CACHE_PREFIX = "xhsmedium-deps-${env.RESOLVED_SHA.take(8)}"
+                    env.XHSMEDIUM_OFFLINE_EVIDENCE_PATH = "${env.WORKSPACE}/offline-dependency-cache.log"
                     echo "RESOLVED_SHA=${env.RESOLVED_SHA}"
                 }
             }
@@ -182,7 +183,7 @@ test \"\\$(docker image inspect --format '{{index .Config.Labels \\\"xhsmedium.p
                 'case "$npm_config_cache" in /tmp/jenkins-XHSMedium-Regression-scheduled-*-npm-cache) rm -rf -- "$npm_config_cache" ;; *) cleanup_status=63 ;; esac\\n' +
                 'exit "$cleanup_status"\\n'
             )
-            archiveArtifacts artifacts: 'scheduled-regression.log,artifacts/test-runs/**,artifacts/regression/**', allowEmptyArchive: true, fingerprint: true
+            archiveArtifacts artifacts: 'scheduled-regression.log,offline-dependency-cache.log,artifacts/test-runs/**,artifacts/regression/**', allowEmptyArchive: true, fingerprint: true
             cleanupWorkspace()
         }
     }

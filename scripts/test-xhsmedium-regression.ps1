@@ -53,8 +53,6 @@ Assert-True ($build.result -eq 'SUCCESS') "Scheduled regression build $buildNumb
 
 $console = (Invoke-WebRequest -UseBasicParsing -Uri "$jobUrl/$buildNumber/consoleText" -Headers $headers -TimeoutSec 30).Content
 Assert-True ($console -match 'Running on regression-agent') 'Scheduled regression ran on the Regression Agent.'
-Assert-True ($console -match 'OFFLINE_DEPENDENCY_CACHE role=runner') 'Runner image used the offline dependency cache.'
-Assert-True ($console -match 'OFFLINE_DEPENDENCY_CACHE role=backend,frontend') 'Backend and frontend images used offline dependency caches.'
 Assert-True ($console -match 'P4_SCHEDULED_REGRESSION_OK') 'Scheduled regression emitted its completion marker.'
 
 $identity = [regex]::Match($console, 'P4_SCHEDULED_REGRESSION_OK runId=(scheduled-[0-9]{8}-[0-9]{6}-[0-9a-f]{8}) sha=([0-9a-f]{40})')
@@ -62,6 +60,9 @@ Assert-True ($identity.Success) 'Console records a unique scheduled runId and fu
 $runId = $identity.Groups[1].Value
 $sha = $identity.Groups[2].Value
 $project = "xhsmedium-test-$runId"
+$offlineEvidence = (Invoke-WebRequest -UseBasicParsing -Uri "$jobUrl/$buildNumber/artifact/offline-dependency-cache.log" -Headers $headers -TimeoutSec 30).Content
+Assert-True ($offlineEvidence -match "OFFLINE_DEPENDENCY_CACHE role=runner sha=$sha") 'Runner image used the fixed-SHA offline dependency cache.'
+Assert-True ($offlineEvidence -match "OFFLINE_DEPENDENCY_CACHE role=backend,frontend sha=$sha") 'Backend and frontend images used fixed-SHA offline dependency caches.'
 
 $summaryUrl = "$jobUrl/$buildNumber/artifact/artifacts/test-runs/$runId/summary.json"
 $summary = Invoke-RestMethod -Uri $summaryUrl -Headers $headers -TimeoutSec 30

@@ -6,11 +6,16 @@ expected_project=${XHSMEDIUM_DOCKER_PROJECT:?XHSMEDIUM_DOCKER_PROJECT is require
 cache_prefix=${XHSMEDIUM_DEPENDENCY_CACHE_PREFIX:?XHSMEDIUM_DEPENDENCY_CACHE_PREFIX is required}
 resolved_sha=${RESOLVED_SHA:?RESOLVED_SHA is required}
 compose_override=${XHSMEDIUM_COMPOSE_OVERRIDE_PATH:?XHSMEDIUM_COMPOSE_OVERRIDE_PATH is required}
+evidence_path=${XHSMEDIUM_OFFLINE_EVIDENCE_PATH:?XHSMEDIUM_OFFLINE_EVIDENCE_PATH is required}
 args=("$@")
 
 if [[ ! -f $compose_override ]]; then
     printf 'Compose compatibility override is missing: %s\n' "$compose_override" >&2
     exit 41
+fi
+if [[ $evidence_path != "${WORKSPACE:?WORKSPACE is required}/offline-dependency-cache.log" ]]; then
+    printf 'Refusing unexpected offline evidence path: %s\n' "$evidence_path" >&2
+    exit 40
 fi
 
 if [[ ${args[0]:-} != compose ]]; then
@@ -54,6 +59,11 @@ verify_cache_image() {
     fi
 }
 
+record_cache_evidence() {
+    local roles=$1
+    printf 'OFFLINE_DEPENDENCY_CACHE role=%s sha=%s\n' "$roles" "$resolved_sha" | tee -a "$evidence_path"
+}
+
 prefix=("${args[@]:0:$action_index}" -f "$compose_override")
 action=${args[$action_index]}
 tail=("${args[@]:$((action_index + 1))}")
@@ -64,7 +74,7 @@ if [[ $action == build ]]; then
         exit 44
     fi
     verify_cache_image runner
-    printf 'OFFLINE_DEPENDENCY_CACHE role=runner sha=%s\n' "$resolved_sha"
+    record_cache_evidence runner
     exec "$real_docker" "${prefix[@]}" build \
         --build-arg NPM_OFFLINE=true \
         --build-arg "RUNNER_DEPENDENCY_CACHE_IMAGE=${cache_prefix}-runner:latest" \
@@ -88,7 +98,7 @@ if [[ $action == up ]]; then
         fi
         verify_cache_image backend
         verify_cache_image frontend
-        printf 'OFFLINE_DEPENDENCY_CACHE role=backend,frontend sha=%s\n' "$resolved_sha"
+        record_cache_evidence backend,frontend
         "$real_docker" "${prefix[@]}" build \
             --build-arg NPM_OFFLINE=true \
             --build-arg "BACKEND_DEPENDENCY_CACHE_IMAGE=${cache_prefix}-backend:latest" \

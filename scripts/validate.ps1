@@ -97,6 +97,7 @@ try {
     Assert-True ($xhsmediumRegression -match "triggers \{ cron\('0 \*/2 \* \* \*'\) \}") 'XHSMedium regression runs at each even-hour slot.'
     Assert-True ($xhsmediumRegression -match 'disableConcurrentBuilds\(abortPrevious: false\)') 'XHSMedium regression does not overlap scheduled runs.'
     Assert-True ($xhsmediumRegression -match 'libraryResource\(''xhsmedium/docker-offline-wrapper\.sh''\)') 'XHSMedium regression installs the reviewed offline Docker wrapper.'
+    Assert-True ($xhsmediumRegression -match 'XHSMEDIUM_OFFLINE_EVIDENCE_PATH' -and $xhsmediumRegression -match 'offline-dependency-cache\.log') 'XHSMedium regression archives fixed-SHA offline cache evidence.'
     Assert-True ($xhsmediumRegression -match 'down --volumes --remove-orphans') 'XHSMedium regression performs exact Compose cleanup.'
     Assert-True ($xhsmediumRegression -match 'VALIDATION_SLOT_UTC' -and $xhsmediumRegression -match 'VALIDATION_TIMEOUT_MINUTES must be between 0 and 30') 'XHSMedium regression bounds admin-only slot and timeout validation parameters.'
     Assert-True ($xhsmediumRegression -match 'NODE_OPTIONS="\$\{SCHEDULE_NODE_OPTIONS:-\}"') 'Production scheduled runs tolerate an absent validation slot shim.'
@@ -105,7 +106,7 @@ try {
 
     $offlineWrapper = Get-Content -Raw -LiteralPath 'shared-library\resources\xhsmedium\docker-offline-wrapper.sh'
     Assert-True ($offlineWrapper -match 'xhsmedium\.preload\.sha' -and $offlineWrapper -match 'xhsmedium\.preload\.role') 'Offline Docker wrapper verifies full SHA and role labels.'
-    Assert-True ($offlineWrapper -match 'OFFLINE_DEPENDENCY_CACHE' -and $offlineWrapper -match 'NPM_OFFLINE=true') 'Offline Docker wrapper reports and enforces cache use.'
+    Assert-True ($offlineWrapper -match 'OFFLINE_DEPENDENCY_CACHE' -and $offlineWrapper -match 'NPM_OFFLINE=true' -and $offlineWrapper -match 'tee -a "\$evidence_path"') 'Offline Docker wrapper persists and enforces cache use.'
     Assert-True ($offlineWrapper -match 'XHSMEDIUM_COMPOSE_OVERRIDE_PATH' -and $offlineWrapper -match 'prefix=.*-f.*compose_override') 'Offline Docker wrapper applies the external MySQL compatibility override.'
     Assert-True ($offlineWrapper -notmatch '/var/run/docker\.sock') 'Offline Docker wrapper never references the host Docker Socket.'
     $mysqlCompatibility = Get-Content -Raw -LiteralPath 'shared-library\resources\xhsmedium\mysql-entrypoint-compat.yaml'
