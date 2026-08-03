@@ -57,8 +57,10 @@ function Wait-AgentsOnline {
         $buildNode = $nodes.computer | Where-Object displayName -eq 'build-agent'
         $regressionNode = $nodes.computer | Where-Object displayName -eq 'regression-agent'
         $releaseNode = $nodes.computer | Where-Object displayName -eq 'release-agent'
-        if ($buildNode -and $regressionNode -and $releaseNode -and -not $buildNode.offline -and -not $regressionNode.offline -and -not $releaseNode.offline) {
-            Write-Host 'PASS: Build, Regression, and Release Agents are online.'
+        $deployDevNode = $nodes.computer | Where-Object displayName -eq 'deploy-dev-agent'
+        $deployTestNode = $nodes.computer | Where-Object displayName -eq 'deploy-test-agent'
+        if ($buildNode -and $regressionNode -and $releaseNode -and $deployDevNode -and $deployTestNode -and -not $buildNode.offline -and -not $regressionNode.offline -and -not $releaseNode.offline -and -not $deployDevNode.offline -and -not $deployTestNode.offline) {
+            Write-Host 'PASS: Build, Regression, Release, Dev Deploy, and Test Deploy Agents are online.'
             return
         }
         Start-Sleep -Seconds 5
@@ -73,8 +75,10 @@ function Wait-AgentsOffline {
         $buildNode = $nodes.computer | Where-Object displayName -eq 'build-agent'
         $regressionNode = $nodes.computer | Where-Object displayName -eq 'regression-agent'
         $releaseNode = $nodes.computer | Where-Object displayName -eq 'release-agent'
-        if ($buildNode -and $regressionNode -and $releaseNode -and $buildNode.offline -and $regressionNode.offline -and $releaseNode.offline) {
-            Write-Host 'PASS: Jenkins observed all three Agents offline.'
+        $deployDevNode = $nodes.computer | Where-Object displayName -eq 'deploy-dev-agent'
+        $deployTestNode = $nodes.computer | Where-Object displayName -eq 'deploy-test-agent'
+        if ($buildNode -and $regressionNode -and $releaseNode -and $deployDevNode -and $deployTestNode -and $buildNode.offline -and $regressionNode.offline -and $releaseNode.offline -and $deployDevNode.offline -and $deployTestNode.offline) {
+            Write-Host 'PASS: Jenkins observed all five Agents offline.'
             return
         }
         Start-Sleep -Seconds 2
@@ -88,6 +92,8 @@ try {
     Invoke-ValidationJob -Name 'build-agent-smoke' -ExpectedResult 'SUCCESS' -Marker 'BUILD_AGENT_OK' | Out-Null
     Invoke-ValidationJob -Name 'regression-agent-smoke' -ExpectedResult 'SUCCESS' -Marker 'REGRESSION_AGENT_OK' | Out-Null
     Invoke-ValidationJob -Name 'release-agent-smoke' -ExpectedResult 'SUCCESS' -Marker 'RELEASE_AGENT_OK' | Out-Null
+    Invoke-ValidationJob -Name 'deploy-dev-agent-smoke' -ExpectedResult 'SUCCESS' -Marker 'DEPLOY_DEV_AGENT_OK' | Out-Null
+    Invoke-ValidationJob -Name 'deploy-test-agent-smoke' -ExpectedResult 'SUCCESS' -Marker 'DEPLOY_TEST_AGENT_OK' | Out-Null
     Invoke-ValidationJob -Name 'workspace-cleanup' -ExpectedResult 'SUCCESS' -Marker 'WORKSPACE_MARKER_CREATED' | Out-Null
 
     $workspaceResidue = docker compose exec --no-TTY build-agent sh -lc 'find /home/jenkins/agent -name marker.txt -print'
@@ -100,11 +106,11 @@ try {
     Write-Host 'PASS: Timeout Docker network was removed by exact name.'
 
     if (-not $SkipReconnect) {
-        docker compose stop build-agent regression-agent release-agent
+        docker compose stop build-agent regression-agent release-agent deploy-dev-agent deploy-test-agent
         if ($LASTEXITCODE -ne 0) { throw 'Could not stop Agents for the offline drill.' }
         $agentsStopped = $true
         Wait-AgentsOffline
-        docker compose start build-agent regression-agent release-agent
+        docker compose start build-agent regression-agent release-agent deploy-dev-agent deploy-test-agent
         if ($LASTEXITCODE -ne 0) { throw 'Could not start Agents after the offline drill.' }
         $agentsStopped = $false
         Wait-AgentsOnline
@@ -114,6 +120,6 @@ try {
     $global:LASTEXITCODE = 0
 }
 finally {
-    if ($agentsStopped) { docker compose start build-agent regression-agent release-agent | Out-Host }
+    if ($agentsStopped) { docker compose start build-agent regression-agent release-agent deploy-dev-agent deploy-test-agent | Out-Host }
     Pop-Location
 }

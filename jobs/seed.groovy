@@ -211,8 +211,40 @@ pipeline {
     }
     post { always { sh 'docker --config "$DOCKER_CONFIG" logout "$LOCAL_REGISTRY" >/dev/null 2>&1 || true; rm -rf -- "$DOCKER_CONFIG"'; deleteDir() } }
 }
+
 '''.stripIndent())
         }
     }
     logRotator { numToKeep(10) }
+}
+
+['dev', 'test'].each { environmentName ->
+    pipelineJob("Platform/Validation/deploy-${environmentName}-agent-smoke") {
+        description("Validates the isolated ${environmentName} Deploy Agent, TLS DIND, and authenticated Registry pull access without deploying an application.")
+        definition {
+            cps {
+                sandbox(true)
+                script("""
+pipeline {
+    agent { label 'xhsmedium-deploy-${environmentName}' }
+    options { skipDefaultCheckout(true); timeout(time: 3, unit: 'MINUTES') }
+    environment { DOCKER_CONFIG = "\${WORKSPACE}/.docker" }
+    stages {
+        stage('Deploy target isolation') {
+            steps {
+                sh 'docker info >/dev/null && docker compose version && test ! -e /var/run/docker.sock && test "\$LOCAL_REGISTRY" = registry:5000 && test "\$DEPLOY_ENVIRONMENT" = ${environmentName}'
+                withCredentials([usernamePassword(credentialsId: 'registry-xhsmedium-push', usernameVariable: 'REGISTRY_USER', passwordVariable: 'REGISTRY_PASSWORD')]) {
+                    sh 'set +x; mkdir -p "\$DOCKER_CONFIG"; printf "%s" "\$REGISTRY_PASSWORD" | docker --config "\$DOCKER_CONFIG" login "\$LOCAL_REGISTRY" --username "\$REGISTRY_USER" --password-stdin >/dev/null'
+                }
+                echo 'DEPLOY_${environmentName.toUpperCase()}_AGENT_OK'
+            }
+        }
+    }
+    post { always { sh 'docker --config "\$DOCKER_CONFIG" logout "\$LOCAL_REGISTRY" >/dev/null 2>&1 || true; rm -rf -- "\$DOCKER_CONFIG"'; deleteDir() } }
+}
+""".stripIndent())
+            }
+        }
+        logRotator { numToKeep(10) }
+    }
 }

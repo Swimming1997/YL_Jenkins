@@ -38,3 +38,17 @@ if (-not (Test-Path -LiteralPath $registryPasswordPath) -or $Force) {
     [System.IO.File]::WriteAllText($registryPasswordPath, (New-RandomSecret), [System.Text.UTF8Encoding]::new($false))
     Write-Host 'Generated secret: registry_password'
 }
+
+foreach ($environmentName in @('dev', 'test')) {
+    foreach ($purpose in @('mysql_password', 'jwt_secret', 'draft_key')) {
+        $name = "deploy_${environmentName}_${purpose}"
+        $path = Join-Path $secretDirectory $name
+        if ((Test-Path -LiteralPath $path) -and -not $Force) {
+            Write-Host "Secret already exists: $name"
+            continue
+        }
+
+        [System.IO.File]::WriteAllText($path, (New-RandomSecret), [System.Text.UTF8Encoding]::new($false))
+        Write-Host "Generated secret: $name"
+    }
+}

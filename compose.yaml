@@ -31,8 +31,16 @@ services:
       - build_agent_ssh_private_key
       - regression_agent_ssh_private_key
       - release_agent_ssh_private_key
+      - deploy_dev_agent_ssh_private_key
+      - deploy_test_agent_ssh_private_key
       - registry_username
       - registry_password
+      - deploy_dev_mysql_password
+      - deploy_dev_jwt_secret
+      - deploy_dev_draft_key
+      - deploy_test_mysql_password
+      - deploy_test_jwt_secret
+      - deploy_test_draft_key
     networks:
       - control
     mem_limit: 1536m
@@ -215,6 +223,142 @@ services:
     cpus: 6.0
     pids_limit: 1024
 
+  deploy-dev-agent:
+    build:
+      context: .
+      dockerfile: agents/deploy/Dockerfile
+    image: jenkins-platform/deploy-agent:docker29
+    restart: unless-stopped
+    environment:
+      DOCKER_HOST: tcp://deploy-dev-docker:2376
+      DOCKER_TLS_VERIFY: "1"
+      DOCKER_CERT_PATH: /certs/client
+    secrets:
+      - source: deploy_dev_agent_ssh_public_key
+        target: deploy_agent_ssh_public_key
+    volumes:
+      - deploy_dev_docker_certs:/certs/client:ro
+    networks:
+      - control
+      - deploy_dev_docker
+    depends_on:
+      deploy-dev-docker:
+        condition: service_healthy
+    tmpfs:
+      - /home/jenkins/agent:size=2g,uid=1000,gid=1000,mode=0700,exec
+    healthcheck:
+      test: ["CMD-SHELL", "ssh-keyscan -T 3 -p 22 127.0.0.1 >/dev/null 2>&1 && docker info >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - NET_BIND_SERVICE
+      - SETGID
+      - SETUID
+      - SYS_CHROOT
+    mem_limit: 1g
+    cpus: 1.0
+    pids_limit: 256
+
+  deploy-dev-docker:
+    image: docker:29.3.1-dind@sha256:686d2c5464787b0ca42420e0aa03a94fc9781ff9bf8b5ff947614b9fa4c3c3e0
+    hostname: deploy-dev-docker
+    restart: unless-stopped
+    privileged: true
+    command: ["--insecure-registry=registry:5000"]
+    environment:
+      DOCKER_TLS_CERTDIR: /certs
+    volumes:
+      - deploy_dev_docker_certs:/certs/client
+      - deploy_dev_docker_data:/var/lib/docker
+    networks:
+      - deploy_dev_docker
+    healthcheck:
+      test: ["CMD", "docker", "info"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    mem_limit: 4g
+    cpus: 4.0
+    pids_limit: 1024
+
+  deploy-test-agent:
+    build:
+      context: .
+      dockerfile: agents/deploy/Dockerfile
+    image: jenkins-platform/deploy-agent:docker29
+    restart: unless-stopped
+    environment:
+      DOCKER_HOST: tcp://deploy-test-docker:2376
+      DOCKER_TLS_VERIFY: "1"
+      DOCKER_CERT_PATH: /certs/client
+    secrets:
+      - source: deploy_test_agent_ssh_public_key
+        target: deploy_agent_ssh_public_key
+    volumes:
+      - deploy_test_docker_certs:/certs/client:ro
+    networks:
+      - control
+      - deploy_test_docker
+    depends_on:
+      deploy-test-docker:
+        condition: service_healthy
+    tmpfs:
+      - /home/jenkins/agent:size=2g,uid=1000,gid=1000,mode=0700,exec
+    healthcheck:
+      test: ["CMD-SHELL", "ssh-keyscan -T 3 -p 22 127.0.0.1 >/dev/null 2>&1 && docker info >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - NET_BIND_SERVICE
+      - SETGID
+      - SETUID
+      - SYS_CHROOT
+    mem_limit: 1g
+    cpus: 1.0
+    pids_limit: 256
+
+  deploy-test-docker:
+    image: docker:29.3.1-dind@sha256:686d2c5464787b0ca42420e0aa03a94fc9781ff9bf8b5ff947614b9fa4c3c3e0
+    hostname: deploy-test-docker
+    restart: unless-stopped
+    privileged: true
+    command: ["--insecure-registry=registry:5000"]
+    environment:
+      DOCKER_TLS_CERTDIR: /certs
+    volumes:
+      - deploy_test_docker_certs:/certs/client
+      - deploy_test_docker_data:/var/lib/docker
+    networks:
+      - deploy_test_docker
+    healthcheck:
+      test: ["CMD", "docker", "info"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    mem_limit: 4g
+    cpus: 4.0
+    pids_limit: 1024
+
   registry-auth-init:
     image: httpd:2.4-alpine@sha256:1b766f17b84026429b7cb243317b142921b24432336e798bc881c43f45ed9567
     restart: "no"
@@ -252,6 +396,8 @@ services:
     networks:
       - release_registry
       - release_docker
+      - deploy_dev_docker
+      - deploy_test_docker
     healthcheck:
       test: ["CMD-SHELL", "test -s /auth/htpasswd && nc -z 127.0.0.1 5000"]
       interval: 10s
@@ -283,6 +429,14 @@ volumes:
     name: ${RELEASE_DOCKER_CERTS_VOLUME:-jenkins_platform_release_docker_certs}
   release_docker_data:
     name: ${RELEASE_DOCKER_DATA_VOLUME:-jenkins_platform_release_docker_data}
+  deploy_dev_docker_certs:
+    name: ${DEPLOY_DEV_DOCKER_CERTS_VOLUME:-jenkins_platform_deploy_dev_docker_certs}
+  deploy_dev_docker_data:
+    name: ${DEPLOY_DEV_DOCKER_DATA_VOLUME:-jenkins_platform_deploy_dev_docker_data}
+  deploy_test_docker_certs:
+    name: ${DEPLOY_TEST_DOCKER_CERTS_VOLUME:-jenkins_platform_deploy_test_docker_certs}
+  deploy_test_docker_data:
+    name: ${DEPLOY_TEST_DOCKER_DATA_VOLUME:-jenkins_platform_deploy_test_docker_data}
   registry_data:
     name: ${REGISTRY_DATA_VOLUME:-jenkins_platform_registry_data}
   registry_auth:
@@ -299,6 +453,10 @@ networks:
   release_registry:
     name: ${RELEASE_REGISTRY_NETWORK_NAME:-jenkins_platform_release_registry}
     internal: true
+  deploy_dev_docker:
+    name: ${DEPLOY_DEV_DOCKER_NETWORK_NAME:-jenkins_platform_deploy_dev_docker}
+  deploy_test_docker:
+    name: ${DEPLOY_TEST_DOCKER_NETWORK_NAME:-jenkins_platform_deploy_test_docker}
 
 secrets:
   jenkins_admin_password:
@@ -319,7 +477,27 @@ secrets:
     file: ./.secrets/release_agent_ssh_key
   release_agent_ssh_public_key:
     file: ./.secrets/release_agent_ssh_key.pub
+  deploy_dev_agent_ssh_private_key:
+    file: ./.secrets/deploy_dev_agent_ssh_key
+  deploy_dev_agent_ssh_public_key:
+    file: ./.secrets/deploy_dev_agent_ssh_key.pub
+  deploy_test_agent_ssh_private_key:
+    file: ./.secrets/deploy_test_agent_ssh_key
+  deploy_test_agent_ssh_public_key:
+    file: ./.secrets/deploy_test_agent_ssh_key.pub
   registry_username:
     file: ./.secrets/registry_username
   registry_password:
     file: ./.secrets/registry_password
+  deploy_dev_mysql_password:
+    file: ./.secrets/deploy_dev_mysql_password
+  deploy_dev_jwt_secret:
+    file: ./.secrets/deploy_dev_jwt_secret
+  deploy_dev_draft_key:
+    file: ./.secrets/deploy_dev_draft_key
+  deploy_test_mysql_password:
+    file: ./.secrets/deploy_test_mysql_password
+  deploy_test_jwt_secret:
+    file: ./.secrets/deploy_test_jwt_secret
+  deploy_test_draft_key:
+    file: ./.secrets/deploy_test_draft_key

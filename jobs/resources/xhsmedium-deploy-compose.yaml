@@ -1,0 +1,84 @@
+services:
+  mysql:
+    image: ${MYSQL_IMAGE}
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_DATABASE: xhsmedium_${DEPLOY_ENVIRONMENT}
+      MYSQL_USER: xhsmedium
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    security_opt:
+      - no-new-privileges:true
+    labels:
+      xhsmedium.deploy.environment: ${DEPLOY_ENVIRONMENT}
+      xhsmedium.deploy.managed-by: jenkins-p6
+
+  backend:
+    image: ${BACKEND_IMAGE}
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: "8089"
+      MYSQL_HOST: mysql
+      MYSQL_PORT: "3306"
+      MYSQL_USER: xhsmedium
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_DATABASE: xhsmedium_${DEPLOY_ENVIRONMENT}
+      JWT_SECRET: ${JWT_SECRET}
+      DRAFT_ENCRYPTION_KEY: ${DRAFT_KEY}
+      SCRAPING_ENABLED: "false"
+    volumes:
+      - uploads:/app/uploads
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8089/api').then(r=>{if(r.status>=500)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    security_opt:
+      - no-new-privileges:true
+    labels:
+      xhsmedium.deploy.environment: ${DEPLOY_ENVIRONMENT}
+      xhsmedium.deploy.git-sha: ${GIT_SHA}
+      xhsmedium.deploy.approval-build: ${APPROVAL_BUILD}
+      xhsmedium.deploy.image-reference: ${BACKEND_IMAGE}
+
+  frontend:
+    image: ${FRONTEND_IMAGE}
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      HOSTNAME: 0.0.0.0
+      PORT: "3302"
+      BACKEND_INTERNAL_URL: http://backend:8089
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3302/').then(r=>{if(r.status>=500)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    security_opt:
+      - no-new-privileges:true
+    labels:
+      xhsmedium.deploy.environment: ${DEPLOY_ENVIRONMENT}
+      xhsmedium.deploy.git-sha: ${GIT_SHA}
+      xhsmedium.deploy.approval-build: ${APPROVAL_BUILD}
+      xhsmedium.deploy.image-reference: ${FRONTEND_IMAGE}
+
+volumes:
+  mysql_data:
+  uploads:

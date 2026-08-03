@@ -73,10 +73,10 @@ curl -u "jenkins-release:$REGISTRY_PASSWORD" \
 ## 4. Jenkins 切换
 
 1. 将 Jenkins 的 Registry 地址改为 `registry.example.com`。
-2. 将云端账号写入 Jenkins `registry-xhsmedium-push` Credential，禁止挂载到 Agent 文件系统。
+2. 将云端 Push 账号写入 Jenkins `registry-xhsmedium-push` Credential；为 Deploy Job另建真正的 pull-only Credential。两者都禁止挂载到 Agent 文件系统。
 3. 删除 Release DIND 的 `--insecure-registry=registry:5000`。
 4. 安装 Registry CA，并验证 `docker login registry.example.com`。
-5. 运行 Release Agent smoke，再执行一个新的、明确授权的候选构建。
+5. 运行 Release Agent 和 Deploy Agent smoke，再执行一个新的、明确授权的候选构建及非生产部署。
 
 正式 Jenkins 和 Registry 不在同一 Compose 网络时，只允许通过 HTTPS/VPN/云内网访问。防火墙不得开放 Docker daemon 2375；Release Agent 仍只连接自己的 TLS DIND 2376。
 
@@ -111,4 +111,3 @@ sha256sum /opt/xhsmedium-registry/backup/registry-*.tar.gz
 - Jenkins Credential 最小权限且日志脱敏。
 - 完整 SHA 标签无法静默覆盖，Release manifest 使用 digest。
 - 磁盘容量、连续 401/5xx、Push 失败和证书过期均有监控。
-

@@ -74,3 +74,65 @@ jenkins:
             sshHostKeyVerificationStrategy:
               nonVerifyingKeyVerificationStrategy: {}
         retentionStrategy: "always"
+    - permanent:
+        name: "deploy-dev-agent"
+        remoteFS: "/home/jenkins/agent"
+        numExecutors: 1
+        mode: EXCLUSIVE
+        labelString: "linux docker-isolated xhsmedium-deploy-dev"
+        nodeProperties:
+          - envVars:
+              env:
+                - key: "DOCKER_HOST"
+                  value: "tcp://deploy-dev-docker:2376"
+                - key: "DOCKER_TLS_VERIFY"
+                  value: "1"
+                - key: "DOCKER_CERT_PATH"
+                  value: "/certs/client"
+                - key: "LOCAL_REGISTRY"
+                  value: "registry:5000"
+                - key: "DEPLOY_ENVIRONMENT"
+                  value: "dev"
+        launcher:
+          ssh:
+            host: "deploy-dev-agent"
+            port: 22
+            credentialsId: "deploy-dev-agent-ssh"
+            javaPath: "/opt/java/openjdk/bin/java"
+            launchTimeoutSeconds: 60
+            maxNumRetries: 10
+            retryWaitTime: 10
+            sshHostKeyVerificationStrategy:
+              nonVerifyingKeyVerificationStrategy: {}
+        retentionStrategy: "always"
+    - permanent:
+        name: "deploy-test-agent"
+        remoteFS: "/home/jenkins/agent"
+        numExecutors: 1
+        mode: EXCLUSIVE
+        labelString: "linux docker-isolated xhsmedium-deploy-test"
+        nodeProperties:
+          - envVars:
+              env:
+                - key: "DOCKER_HOST"
+                  value: "tcp://deploy-test-docker:2376"
+                - key: "DOCKER_TLS_VERIFY"
+                  value: "1"
+                - key: "DOCKER_CERT_PATH"
+                  value: "/certs/client"
+                - key: "LOCAL_REGISTRY"
+                  value: "registry:5000"
+                - key: "DEPLOY_ENVIRONMENT"
+                  value: "test"
+        launcher:
+          ssh:
+            host: "deploy-test-agent"
+            port: 22
+            credentialsId: "deploy-test-agent-ssh"
+            javaPath: "/opt/java/openjdk/bin/java"
+            launchTimeoutSeconds: 60
+            maxNumRetries: 10
+            retryWaitTime: 10
+            sshHostKeyVerificationStrategy:
+              nonVerifyingKeyVerificationStrategy: {}
+        retentionStrategy: "always"

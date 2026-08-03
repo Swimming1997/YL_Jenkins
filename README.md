@@ -59,6 +59,7 @@ Get-Content .\.secrets\jenkins_admin_password
 .\scripts\test-xhsmedium-watcher.ps1
 .\scripts\test-hardening.ps1 -Cycles 3
 .\scripts\test-xhsmedium-release.ps1
+.\scripts\test-xhsmedium-deploy.ps1
 ```
 
 验证数据卷在容器重建后仍然保留数据：
@@ -107,7 +108,7 @@ docker compose down
 - 不向不可信 PR 提供发布、生产或高权限 Docker 凭据。
 - 不在仓库保存真实密码、Token、Cookie 或连接串。
 - 当前不调用 FTP、飞书、生产数据库或其他真实外部系统。
-- P5 仅向本地认证 Registry 写入已授权的 XHSMedium 候选镜像；不向公网发布、不部署业务，也不连接真实外部系统。
+- P5 仅向本地认证 Registry 写入已授权候选镜像；P6 只在隔离的本地 dev/test DIND 中部署 approved digest。两阶段均不向公网或生产发布，也不连接真实外部系统。
 
 ## 文档
 
@@ -122,6 +123,7 @@ docker compose down
 - `docs/onboarding-project.md`：新项目接入门禁和验收要求
 - `docs/xhsmedium-release.md`：候选镜像、digest manifest 和 Release 准入
 - `docs/registry-cloud-deployment.md`：云服务器自建 Registry 的 TLS、备份和 Jenkins 切换
+- `docs/xhsmedium-deployment.md`：P6 dev/test digest 部署、幂等、健康检查和回滚
 - `docs/agents.md`：Agent 标签、连接和验证
 - `docs/docker-isolation.md`：专用 DIND 与清理边界
 - `docs/xhsmedium-ci.md`：XHSMedium 手工只读 CI、证据和安全边界
