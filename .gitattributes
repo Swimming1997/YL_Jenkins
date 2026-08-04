@@ -1,1 +1,2 @@
 scripts/bootstrap-paper-server.sh text eol=lf
+shared-library/resources/xhsmedium/npm-ci-network-retry.sh text eol=lf

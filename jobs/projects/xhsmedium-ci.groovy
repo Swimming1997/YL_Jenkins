@@ -84,7 +84,7 @@ pipeline {
                     module: 'backend',
                     logName: 'backend.log',
                     commands: [
-                        'npm ci --no-audit --no-fund',
+                        './.npm-ci-network-retry.sh --no-audit --no-fund',
                         'npm test -- --runInBand --json --outputFile="$WORKSPACE/ci-evidence/backend-tests.json"',
                         'npm run build'
                     ]
@@ -98,8 +98,8 @@ pipeline {
                     module: 'frontend',
                     logName: 'frontend.log',
                     commands: [
-                        'npm ci --prefix ../automation --no-audit --no-fund',
-                        'npm ci --no-audit --no-fund',
+                        './.npm-ci-network-retry.sh --prefix ../automation --no-audit --no-fund',
+                        './.npm-ci-network-retry.sh --no-audit --no-fund',
                         'npm run lint',
                         'npm test',
                         'npm run build'
@@ -114,7 +114,7 @@ pipeline {
                     module: 'automation',
                     logName: 'automation.log',
                     commands: [
-                        'npm ci --no-audit --no-fund',
+                        './.npm-ci-network-retry.sh --no-audit --no-fund',
                         'npm test',
                         'npm run validate'
                     ]
@@ -128,7 +128,7 @@ pipeline {
                     module: 'regression',
                     logName: 'regression.log',
                     commands: [
-                        'npm ci --no-audit --no-fund',
+                        './.npm-ci-network-retry.sh --no-audit --no-fund',
                         'npm test'
                     ]
                 )

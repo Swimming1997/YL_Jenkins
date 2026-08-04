@@ -14,7 +14,9 @@ def call(Map config = [:]) {
     }
 
     String commandBlock = commands.collect { it.toString() }.join('\n')
+    String npmRetryHelper = libraryResource('xhsmedium/npm-ci-network-retry.sh')
     dir(module) {
+        writeFile(file: '.npm-ci-network-retry.sh', text: npmRetryHelper)
         sh(
             label: "${module} read-only CI",
             script: """#!/usr/bin/env bash
@@ -22,8 +24,9 @@ set -euo pipefail
 mkdir -p \"\$WORKSPACE/ci-evidence\"
 : > \"\$WORKSPACE/ci-evidence/${logName}\"
 exec > >(tee -a \"\$WORKSPACE/ci-evidence/${logName}\") 2>&1
-cleanup_node_modules() { rm -rf -- node_modules; }
+cleanup_node_modules() { rm -rf -- node_modules; rm -f -- .npm-ci-network-retry.sh; }
 trap cleanup_node_modules EXIT
+chmod 0700 .npm-ci-network-retry.sh
 ${commandBlock}
 """
         )

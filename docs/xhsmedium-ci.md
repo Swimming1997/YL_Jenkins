@@ -29,6 +29,8 @@ frontend e2e TypeScript 会导入 `automation/src/fixtures`。因此 frontend li
 
 所有 npm 依赖均安装在容器内的临时 Workspace。作业禁止并发，后一次手工触发会取消仍在运行的前一次构建；全局超时为 45 分钟。无论成功、失败或超时，证据归档后都会删除 Workspace。
 
+每个 `npm ci` 通过 Shared Library 的有界网络包装执行。只有输出包含 `ECONNRESET`、`ETIMEDOUT`、`EAI_AGAIN`、`ENETUNREACH`、`ECONNREFUSED` 或 `ERR_SOCKET_TIMEOUT` 时才允许重试，最多执行三次，间隔为 2 秒和 4 秒。`ERESOLVE`、install script、lint、测试和构建失败不会重试，最终失败保留原始退出码。控制台以 `NPM_CI_NETWORK_RETRY` 标记网络重试，不改变官方 npm registry，也不持久化依赖缓存。
+
 每个模块结束时立即删除该模块的 `node_modules`，避免多个依赖树同时占用 tmpfs/cgroup 内存。npm cache 使用 `/tmp/${BUILD_TAG}-npm-cache` 唯一路径并在 `post` 精确清理；测试 JSON 和模块日志保留到归档完成。
 
 Build Agent Workspace tmpfs 允许执行 Jenkins Git 包装及 `node_modules/.bin`，但仍保留 `nosuid`、`nodev`、`no-new-privileges`、能力裁剪和无 Docker/宿主机挂载边界。

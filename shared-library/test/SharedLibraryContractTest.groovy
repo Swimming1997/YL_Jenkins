@@ -66,20 +66,38 @@ class SharedLibraryContractTest extends BasePipelineTest {
     void nodeModuleCiRunsInsideRequestedDirectory() {
         String selectedDirectory = null
         Map shellCall = null
+        Map written = null
         helper.registerAllowedMethod('dir', [String, Closure]) { String directory, Closure body ->
             selectedDirectory = directory
             body()
         }
+        helper.registerAllowedMethod('libraryResource', [String]) { String resource -> "resource:${resource}" }
+        helper.registerAllowedMethod('writeFile', [Map]) { Map arguments -> written = arguments }
         helper.registerAllowedMethod('sh', [Map]) { Map arguments -> shellCall = arguments }
         def script = loadScript('vars/nodeModuleCi.groovy')
 
-        script.call(module: 'backend', logName: 'backend.log', commands: ['npm ci', 'npm test'])
+        script.call(module: 'backend', logName: 'backend.log', commands: ['./.npm-ci-network-retry.sh', 'npm test'])
 
         assert selectedDirectory == 'backend'
-        assert shellCall.script.contains('npm ci\nnpm test')
+        assert written == [file: '.npm-ci-network-retry.sh', text: 'resource:xhsmedium/npm-ci-network-retry.sh']
+        assert shellCall.script.contains('./.npm-ci-network-retry.sh\nnpm test')
         assert shellCall.script.contains('ci-evidence/backend.log')
+        assert shellCall.script.contains('chmod 0700 .npm-ci-network-retry.sh')
         assert shellCall.script.contains('trap cleanup_node_modules EXIT')
         assert shellCall.script.contains('rm -rf -- node_modules')
+        assert shellCall.script.contains('rm -f -- .npm-ci-network-retry.sh')
+    }
+
+    @Test
+    void npmCiRetryHelperIsBoundedToTransientNetworkFailures() {
+        String retryHelper = new File('resources/xhsmedium/npm-ci-network-retry.sh').text
+
+        assert retryHelper.contains('max_attempts=3')
+        assert retryHelper.contains('npm ci "$@"')
+        assert retryHelper.contains('ECONNRESET|ETIMEDOUT|EAI_AGAIN|ENETUNREACH|ECONNREFUSED|ERR_SOCKET_TIMEOUT')
+        assert retryHelper.contains('NPM_CI_NETWORK_RETRY')
+        assert retryHelper.contains('exit "$status"')
+        assert !retryHelper.contains('registry.npmmirror.com')
     }
 
     @Test

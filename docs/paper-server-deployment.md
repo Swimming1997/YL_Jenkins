@@ -31,6 +31,8 @@ paper-server 的默认 Docker 构建网络访问国际 Debian 软件源时可能
 
 Build Agent 在 paper-server 上使用独立的阿里云 Debian 与 Debian Security 镜像参数，并对 apt 设置 20 秒下载超时和 5 次重试。Dockerfile 的镜像参数默认留空，因此其他环境仍使用基础镜像原有软件源。
 
+XHSMedium P3 CI 继续使用官方 npm registry。针对 paper-server 上已观测到的下载连接重置，Shared Library 只对明确的瞬时网络错误有界重试 `npm ci`；不会重试测试或构建，也不会切换第三方 npm 供应链。
+
 ## 访问边界
 
 Jenkins 和 Registry 只绑定服务器 localhost：
