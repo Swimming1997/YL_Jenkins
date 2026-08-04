@@ -2,6 +2,8 @@ services:
   controller:
     build:
       network: host
+    environment:
+      PAPER_SERVER_RESOURCE_MODE: "true"
     mem_limit: 1280m
     cpus: 1.0
 

@@ -35,6 +35,10 @@ XHSMedium 的初始化脚本会被 MySQL 官方 entrypoint `source`，其中的 
 
 依赖锁文件或待测 SHA 更新后必须先重新执行预加载。预加载只使用宿主机 Docker 客户端，不向 Agent 挂载 Docker Socket；临时源码快照和 tar 无论成功失败都会删除。
 
+paper-server 不安装 PowerShell，使用 `scripts/preload-xhsmedium-regression.sh`完成等价预加载。它通过 `.secrets/xhsmedium_scm_token`只读获取指定完整 SHA，不读取服务器已有的其他 XHSMedium 工作目录；三个依赖 Stage 和全部测试运行仍在 Docker 中。该环境设置 `PAPER_SERVER_RESOURCE_MODE=true`，所以两小时 Timer Trigger 不会在重型 profile 停止时排队，固定 SHA 验收由管理员在 Regression profile 活跃期间手工触发。
+
+Regression Agent 为准备 sealed plan 执行的三个 `npm ci`复用 CI 的有界网络重试器：只识别 `ECONNRESET`、`ETIMEDOUT`、`EAI_AGAIN`、`ENETUNREACH`、`ECONNREFUSED`和`ERR_SOCKET_TIMEOUT`，最多三次、延迟 2 秒和 4 秒。测试、automation build 和确定性依赖错误不重试，最终原始状态保持不变。
+
 ## 失败与精确清理
 
 automation 自身的 `clean`完成后，Jenkins post 仍会对固定 Compose project 执行 `down --volumes --remove-orphans`。人工中断可能与 `docker compose run --rm`创建 one-off 容器并发，因此平台还会按精确 `com.docker.compose.project`标签重试移除该 project 的容器、卷和网络；连续三次观察为空才输出 `P4_EXACT_PROJECT_CLEANUP_OK`。辅助脚本只接受 `xhsmedium-test-scheduled-*`，禁止全局 prune，未收敛时让 post 失败。

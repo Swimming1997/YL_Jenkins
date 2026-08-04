@@ -14,6 +14,8 @@ paper-server 是共享的 Ubuntu Docker 主机。Jenkins 平台固定部署在 `
 
 Regression、Release、dev Deploy 和 test Deploy 的 Agent/DIND 均放在 profile 中。任何时刻只允许一个重型 profile 执行任务，不得并行运行回归、制品构建和两个环境部署。
 
+Controller 在该覆盖文件中设置 `PAPER_SERVER_RESOURCE_MODE=true`。因此 `XHSMedium/Regression/scheduled`在 paper-server 上保留相同的固定 SHA Pipeline，但不安装两小时 Timer Trigger；重型 Regression profile 停止时不会产生无法消费的排队构建。其他部署形态未设置该变量，仍保留 `0 */2 * * *`定时触发。
+
 ## 初始化
 
 仓库、`.env` 和 `.secrets/` 必须位于 `/opt/jenkins-platform`。`xhsmedium_scm_token` 需要预先放入 `.secrets/`；引导脚本会在服务器生成其他独立密码和 Agent 密钥，不覆盖已有 Secret。
@@ -71,6 +73,28 @@ docker compose -f compose.yaml -f compose.paper-server.yaml stop deploy-dev-agen
 docker compose -f compose.yaml -f compose.paper-server.yaml --profile deploy-test up -d --build deploy-test-docker deploy-test-agent
 docker compose -f compose.yaml -f compose.paper-server.yaml stop deploy-test-agent deploy-test-docker
 ```
+
+首次执行某个固定 SHA 前，先启动 Regression profile，再由 Linux 预加载器以只读 SCM Secret 获取该精确提交。预加载器仅在临时、被 Git 忽略的目录保存源码快照；依赖镜像在宿主机 Docker 中构建并导入隔离 DIND，宿主机不安装 Node.js、PowerShell 或项目运行时。缺失的固定输入镜像只在显式传入 `--pull-inputs`时拉取，拉取后仍必须匹配锁定 image ID：
+
+```bash
+./scripts/preload-xhsmedium-regression.sh \
+  --sha 7cdce9cce6b4252c1727e08404bf95dcf73b2f54 \
+  --pull-inputs
+
+./scripts/preload-xhsmedium-regression.sh \
+  --sha 7cdce9cce6b4252c1727e08404bf95dcf73b2f54 \
+  --verify-only
+```
+
+paper-server 的手工验收槽使用同一固定 SHA，并要求偶数 UTC 小时格式。脚本会触发 Job、等待最终结果、验证 11 个业务 Stage、Requirement 汇总、离线缓存证据、Secret 脱敏和精确清理：
+
+```bash
+./scripts/test-xhsmedium-regression-paper-server.sh \
+  --sha 7cdce9cce6b4252c1727e08404bf95dcf73b2f54 \
+  --slot 2026-08-04T20:00:00Z
+```
+
+验收完成后停止 Regression profile。paper-server 的手工槽不替代其他环境已经完成的真实 TimerTrigger 验收。
 
 启动下一个 profile 前，必须确认上一个 Agent/DIND 已停止且 Jenkins 队列为空。禁止使用无范围的 `docker system prune`，也不得对共享主机执行 `docker compose down --volumes`。
 

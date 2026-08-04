@@ -1,10 +1,17 @@
+def paperServerResourceMode = System.getenv('PAPER_SERVER_RESOURCE_MODE')?.equalsIgnoreCase('true')
+
 pipelineJob('XHSMedium/Regression/scheduled') {
-    description('Runs the XHSMedium sealed scheduled-regression plan every two hours at a fixed dev SHA on the isolated Regression Agent and offline runtime DIND.')
+    description(paperServerResourceMode ?
+        'Runs the XHSMedium sealed regression plan on demand in paper-server resource mode at a fixed SHA on the isolated Regression Agent and offline runtime DIND.' :
+        'Runs the XHSMedium sealed scheduled-regression plan every two hours at a fixed dev SHA on the isolated Regression Agent and offline runtime DIND.')
     parameters {
         stringParam('BRANCH', 'dev', 'Trusted XHSMedium branch. Scheduled runs use dev.')
         stringParam('GIT_SHA', '', 'Optional full SHA for a manually scheduled slot. It overrides branch resolution.')
         stringParam('VALIDATION_SLOT_UTC', '', 'Admin-only validation slot in YYYY-MM-DDTHH:00:00Z format. Empty for real cron runs.')
         stringParam('VALIDATION_TIMEOUT_MINUTES', '0', 'Admin-only inner timeout from 0 to 30 minutes. Zero disables it.')
+    }
+    if (!paperServerResourceMode) {
+        triggers { cron('0 */2 * * *') }
     }
     definition {
         cps {
@@ -26,7 +33,6 @@ pipeline {
         XHSMEDIUM_RUNNER_ENTRYPOINT_PATH = "/home/jenkins/agent/.platform-compat/${BUILD_TAG}-runner-entrypoint.sh"
         XHSMEDIUM_PROJECT_CLEANUP_PATH = "/home/jenkins/agent/.platform-compat/${BUILD_TAG}-project-cleanup.sh"
     }
-    triggers { cron('0 */2 * * *') }
     options {
         skipDefaultCheckout(true)
         disableConcurrentBuilds(abortPrevious: false)
@@ -90,6 +96,7 @@ test \"\\$(docker image inspect --format '{{index .Config.Labels \\\"xhsmedium.p
                     }
                     sh 'mkdir -p .platform-bin'
                     writeFile(file: '.platform-bin/docker', text: libraryResource('xhsmedium/docker-offline-wrapper.sh'))
+                    writeFile(file: '.platform-bin/npm-ci-network-retry', text: libraryResource('xhsmedium/npm-ci-network-retry.sh'))
                     writeFile(file: '.mysql-entrypoint-compat.yaml', text: libraryResource('xhsmedium/mysql-entrypoint-compat.yaml'))
                     writeFile(file: '.mysql-init-wrapper.sh', text: libraryResource('xhsmedium/mysql-init-wrapper.sh'))
                     writeFile(file: '.runner-volume-entrypoint.sh', text: libraryResource('xhsmedium/runner-volume-entrypoint.sh'))
@@ -115,7 +122,7 @@ test \"\\$(docker image inspect --format '{{index .Config.Labels \\\"xhsmedium.p
                 }
                 sh(
                     'set -eu\\n' +
-                    'chmod 700 .platform-bin/docker\\n' +
+                    'chmod 700 .platform-bin/docker .platform-bin/npm-ci-network-retry\\n' +
                     'install -m 600 .mysql-entrypoint-compat.yaml "$XHSMEDIUM_COMPOSE_OVERRIDE_PATH"\\n' +
                     'mkdir -p "$(dirname "$XHSMEDIUM_MYSQL_INIT_WRAPPER_PATH")"\\n' +
                     'install -m 644 .mysql-init-wrapper.sh "$XHSMEDIUM_MYSQL_INIT_WRAPPER_PATH"\\n' +
@@ -126,11 +133,11 @@ test \"\\$(docker image inspect --format '{{index .Config.Labels \\\"xhsmedium.p
                     'rm -f .mysql-init-wrapper.sh\\n' +
                     'rm -f .runner-volume-entrypoint.sh\\n' +
                     'rm -f .docker-project-cleanup.sh\\n' +
-                    'npm ci --prefix regression --no-audit --no-fund\\n' +
+                    '.platform-bin/npm-ci-network-retry --prefix regression --no-audit --no-fund\\n' +
                     'mkdir -p regression/worktrees\\n' +
                     'cp automation/package.json automation/package-lock.json regression/worktrees/\\n' +
-                    'npm ci --prefix regression/worktrees --no-audit --no-fund\\n' +
-                    'npm ci --prefix automation --no-audit --no-fund\\n' +
+                    '.platform-bin/npm-ci-network-retry --prefix regression/worktrees --no-audit --no-fund\\n' +
+                    '.platform-bin/npm-ci-network-retry --prefix automation --no-audit --no-fund\\n' +
                     'npm run build --prefix automation\\n'
                 )
                 script {
