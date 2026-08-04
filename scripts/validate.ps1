@@ -42,6 +42,9 @@ try {
     Assert-True ($dockerfile -match 'jenkins/jenkins:2\.568\.1-jdk21@sha256:[0-9a-f]{64}') 'Jenkins numeric LTS tag and digest are pinned.'
     $buildAgentDockerfile = Get-Content -Raw -LiteralPath 'agents\build\Dockerfile'
     Assert-True ($buildAgentDockerfile -match '(?s)apt-get install.*?g\+\+\s+make\s+python3') 'Build Agent image installs the native Node.js build toolchain.'
+    Assert-True ($buildAgentDockerfile -match 'ARG DEBIAN_MIRROR=\s*\r?\n' -and $buildAgentDockerfile -match 'ARG DEBIAN_SECURITY_MIRROR=\s*\r?\n') 'Build Agent Debian mirror overrides are optional by default.'
+    Assert-True ($buildAgentDockerfile -match 'deb\.debian\.org/debian-security.*?DEBIAN_SECURITY_MIRROR' -and $buildAgentDockerfile -match 'deb\.debian\.org/debian.*?DEBIAN_MIRROR') 'Build Agent supports separate Debian and security mirror overrides.'
+    Assert-True (([regex]::Matches($buildAgentDockerfile, 'Acquire::Retries=5')).Count -eq 2 -and ([regex]::Matches($buildAgentDockerfile, 'Acquire::(?:http|https)::Timeout=20')).Count -eq 4) 'Build Agent apt downloads use bounded retries and timeouts.'
     $regressionAgentDockerfile = Get-Content -Raw -LiteralPath 'agents\regression\Dockerfile'
     Assert-True ($regressionAgentDockerfile -match '(?s)apt-get install.*?g\+\+.*?make.*?python3' -and $regressionAgentDockerfile -match '(?s)python3 --version.*?make --version.*?g\+\+ --version') 'Regression Agent image installs and smokes the native Node.js build toolchain.'
 
@@ -55,7 +58,7 @@ try {
         Assert-True ($pluginNames -contains $required) "Required plugin '$required' is locked."
     }
 
-    foreach ($configFile in @('jcasc\jenkins.yaml', 'jcasc\security.yaml', 'jcasc\authorization.yaml', 'jcasc\jobs.yaml', 'jcasc\agents.yaml', 'jcasc\credentials.yaml', 'jobs\folders.groovy', 'jobs\seed.groovy', 'jobs\projects\xhsmedium-ci.groovy', 'jobs\projects\xhsmedium-regression.groovy', 'jobs\projects\xhsmedium-release.groovy', 'jobs\projects\xhsmedium-deploy.groovy', 'jobs\resources\xhsmedium-deploy-compose.yaml', 'shared-library\vars\validateGitRef.groovy', 'shared-library\vars\nodeModuleCi.groovy', 'shared-library\vars\recordBuildMetadata.groovy', 'shared-library\vars\scmChangeDecision.groovy', 'shared-library\resources\xhsmedium\docker-offline-wrapper.sh', 'shared-library\resources\xhsmedium\mysql-entrypoint-compat.yaml', 'shared-library\resources\xhsmedium\mysql-init-wrapper.sh', 'shared-library\resources\xhsmedium\scheduled-slot-shim.cjs', 'shared-library\resources\xhsmedium\runner-volume-entrypoint.sh', 'shared-library\resources\xhsmedium\docker-project-cleanup.sh', 'scripts\preload-xhsmedium-regression.ps1', 'scripts\test-xhsmedium-regression.ps1', 'scripts\test-xhsmedium-regression-resilience.ps1', 'scripts\test-xhsmedium-watcher.ps1', 'scripts\test-xhsmedium-release.ps1', 'scripts\test-xhsmedium-deploy.ps1', 'scripts\test-backup-restore.ps1', 'scripts\test-disk-pressure.ps1', 'scripts\test-retention.ps1', 'scripts\test-hardening.ps1', 'docs\platform-hardening.md', 'docs\operations.md', 'docs\incident-response.md', 'docs\onboarding-project.md', 'docs\xhsmedium-release.md', 'docs\xhsmedium-deployment.md', 'docs\registry-cloud-deployment.md', 'agents\build\Dockerfile', 'agents\regression\Dockerfile', 'agents\release\Dockerfile', 'agents\release\entrypoint.sh', 'agents\deploy\Dockerfile', 'agents\deploy\entrypoint.sh')) {
+    foreach ($configFile in @('jcasc\jenkins.yaml', 'jcasc\security.yaml', 'jcasc\authorization.yaml', 'jcasc\jobs.yaml', 'jcasc\agents.yaml', 'jcasc\credentials.yaml', 'jobs\folders.groovy', 'jobs\seed.groovy', 'jobs\projects\xhsmedium-ci.groovy', 'jobs\projects\xhsmedium-regression.groovy', 'jobs\projects\xhsmedium-release.groovy', 'jobs\projects\xhsmedium-deploy.groovy', 'jobs\resources\xhsmedium-deploy-compose.yaml', 'shared-library\vars\validateGitRef.groovy', 'shared-library\vars\nodeModuleCi.groovy', 'shared-library\vars\recordBuildMetadata.groovy', 'shared-library\vars\scmChangeDecision.groovy', 'shared-library\resources\xhsmedium\docker-offline-wrapper.sh', 'shared-library\resources\xhsmedium\mysql-entrypoint-compat.yaml', 'shared-library\resources\xhsmedium\mysql-init-wrapper.sh', 'shared-library\resources\xhsmedium\scheduled-slot-shim.cjs', 'shared-library\resources\xhsmedium\runner-volume-entrypoint.sh', 'shared-library\resources\xhsmedium\docker-project-cleanup.sh', 'scripts\preload-xhsmedium-regression.ps1', 'scripts\test-xhsmedium-regression.ps1', 'scripts\test-xhsmedium-regression-resilience.ps1', 'scripts\test-xhsmedium-watcher.ps1', 'scripts\test-xhsmedium-release.ps1', 'scripts\test-xhsmedium-deploy.ps1', 'scripts\test-backup-restore.ps1', 'scripts\test-disk-pressure.ps1', 'scripts\test-retention.ps1', 'scripts\test-hardening.ps1', 'scripts\bootstrap-paper-server.sh', 'compose.paper-server.yaml', 'docs\platform-hardening.md', 'docs\operations.md', 'docs\incident-response.md', 'docs\onboarding-project.md', 'docs\xhsmedium-release.md', 'docs\xhsmedium-deployment.md', 'docs\registry-cloud-deployment.md', 'docs\paper-server-deployment.md', 'agents\build\Dockerfile', 'agents\regression\Dockerfile', 'agents\release\Dockerfile', 'agents\release\entrypoint.sh', 'agents\deploy\Dockerfile', 'agents\deploy\entrypoint.sh')) {
         Assert-True (Test-Path -LiteralPath $configFile) "Configuration file '$configFile' exists."
     }
 
@@ -192,8 +195,20 @@ try {
     Assert-True ($seedJobs -match "pipelineJob\('Platform/Validation/release-agent-smoke'\)" -and $seedJobs -match 'RELEASE_AGENT_OK') 'Release Agent smoke verifies TLS DIND and authenticated Registry access.'
     Assert-True ($seedJobs -match 'deploy-\$\{environmentName\}-agent-smoke' -and $seedJobs -match 'DEPLOY_\$\{environmentName\.toUpperCase\(\)\}_AGENT_OK') 'Deploy Agent smoke Jobs verify both isolated deployment targets.'
 
+    $paperCompose = Get-Content -Raw -LiteralPath 'compose.paper-server.yaml'
+    Assert-True (([regex]::Matches($paperCompose, '(?m)^\s+network:\s+host\s*$')).Count -eq 6) 'paper-server uses host networking only for six trusted image builds.'
+    Assert-True (([regex]::Matches($paperCompose, '(?m)^\s+profiles:\s+\["(?:regression|release|deploy-dev|deploy-test)"\]\s*$')).Count -eq 8) 'paper-server gates all eight heavy Agent and DIND services behind profiles.'
+    Assert-True ($paperCompose -match 'DEBIAN_MIRROR:\s+https://mirrors\.aliyun\.com/debian\s' -and $paperCompose -match 'DEBIAN_SECURITY_MIRROR:\s+https://mirrors\.aliyun\.com/debian-security\s') 'paper-server Build Agent uses separate reachable Debian mirrors.'
+    Assert-True ($paperCompose -match '(?s)controller:.*?mem_limit:\s+1280m.*?cpus:\s+1\.0' -and $paperCompose -match '(?s)build-agent:.*?mem_limit:\s+2g.*?cpus:\s+1\.5' -and $paperCompose -match '(?s)registry:.*?mem_limit:\s+512m.*?cpus:\s+0\.25') 'paper-server baseline services have bounded CPU and memory.'
+    Assert-True ($paperCompose -notmatch '/var/run/docker\.sock') 'paper-server override does not introduce the host Docker Socket.'
+    $paperBootstrap = Get-Content -Raw -LiteralPath 'scripts\bootstrap-paper-server.sh'
+    Assert-True ($paperBootstrap -match 'repo_root" != "/opt/jenkins-platform"' -and $paperBootstrap -match 'Missing required read-only SCM Secret') 'paper-server bootstrap enforces its fixed root and required read-only SCM Secret.'
+    Assert-True ($paperBootstrap -match 'up --detach --build controller build-agent registry' -and $paperBootstrap -notmatch '(?i)down\s+--volumes|system\s+prune') 'paper-server bootstrap starts only baseline services and performs no destructive global cleanup.'
+
     docker compose config --quiet
     Assert-True ($LASTEXITCODE -eq 0) 'Docker Compose configuration is valid.'
+    docker compose -f compose.yaml -f compose.paper-server.yaml config --quiet
+    Assert-True ($LASTEXITCODE -eq 0) 'paper-server Docker Compose override is valid.'
 
     if ($Runtime) {
         $containerId = (docker compose ps --quiet controller).Trim()

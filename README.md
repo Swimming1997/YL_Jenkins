@@ -1,6 +1,6 @@
 # Jenkins Platform
 
-本仓库提供可重建的 Jenkins 平台。当前实现范围为 G0～P4.5：在本地 Docker Desktop 中运行 Jenkins Controller、隔离 Build/Regression Agent 和专用 Docker-in-Docker，并通过 JCasC、Role Strategy 和 Job DSL 自动恢复平台配置；XHSMedium 已接入按新 SHA 触发的只读 CI 和每两小时离线定时回归，并完成首期加速加固验收。
+本仓库提供可重建的 Jenkins 平台。当前实现范围为 G0～P6：在 Docker 主机中运行 Jenkins Controller、按用途隔离的 Agent 和专用 Docker-in-Docker，并通过 JCasC、Role Strategy 和 Job DSL 自动恢复平台配置；XHSMedium 已完成只读 CI、定时离线回归、不可变 Release 和隔离 dev/test 部署验收。P5～P6 当前仍属于本地或受控测试环境能力，不构成生产发布授权。
 
 ## 当前基线
 
@@ -8,7 +8,7 @@
 - 官方镜像 digest：`sha256:f4f65e6cd1405cd889b7f5ac33f9d5cdc2a099de6b87fe8a3933b9c5d53d1d02`
 - 容器端口：`8080`，仅绑定宿主机 `127.0.0.1`
 - 数据目录：Docker named volume `jenkins_platform_home`
-- Agent：Linux Build Agent 与隔离 Regression Agent
+- Agent：Linux Build、Regression、Release 与独立 dev/test Deploy Agent
 - Release：独立 Release Agent、TLS DIND 与 localhost 认证 Registry
 - 平台 Git 远端：`https://github.com/Swimming1997/YL_Jenkins.git`
 - 全局 Shared Library：`jenkins-platform-library`，默认版本 `main`
@@ -101,6 +101,23 @@ docker compose down
 
 云服务器部署前还必须补齐 HTTPS、企业身份认证、正式备份目标、防火墙和监控。本地账户和 localhost HTTP 配置不能直接作为生产配置使用。
 
+## paper-server 测试部署
+
+`paper-server` 使用 `/opt/jenkins-platform` 和 `compose.paper-server.yaml`。基线只常驻 Controller、Build Agent 与 Registry；Regression、Release 和 dev/test Deploy 通过 profile 串行启停，避免多个 DIND 在 4 vCPU、15 GiB 内存的共享服务器上并发运行。
+
+```bash
+cd /opt/jenkins-platform
+./scripts/bootstrap-paper-server.sh
+```
+
+Jenkins 与 Registry 均只监听服务器 localhost。通过 SSH 隧道访问 Jenkins：
+
+```powershell
+ssh -L 8080:127.0.0.1:8080 paper-server
+```
+
+详细的资源边界、profile 命令、Secret 规则和验收方法见 `docs/paper-server-deployment.md`。
+
 ## 安全边界
 
 - 不把 Docker Socket 挂载到 Controller。
@@ -123,6 +140,7 @@ docker compose down
 - `docs/onboarding-project.md`：新项目接入门禁和验收要求
 - `docs/xhsmedium-release.md`：候选镜像、digest manifest 和 Release 准入
 - `docs/registry-cloud-deployment.md`：云服务器自建 Registry 的 TLS、备份和 Jenkins 切换
+- `docs/paper-server-deployment.md`：paper-server 资源受限测试部署、profile 和运维边界
 - `docs/xhsmedium-deployment.md`：P6 dev/test digest 部署、幂等、健康检查和回滚
 - `docs/agents.md`：Agent 标签、连接和验证
 - `docs/docker-isolation.md`：专用 DIND 与清理边界

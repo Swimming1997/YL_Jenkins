@@ -1,0 +1,67 @@
+services:
+  controller:
+    build:
+      network: host
+    mem_limit: 1280m
+    cpus: 1.0
+
+  build-agent:
+    build:
+      network: host
+      args:
+        DEBIAN_MIRROR: https://mirrors.aliyun.com/debian
+        DEBIAN_SECURITY_MIRROR: https://mirrors.aliyun.com/debian-security
+    mem_limit: 2g
+    cpus: 1.5
+
+  regression-agent:
+    build:
+      network: host
+    profiles: ["regression"]
+    mem_limit: 768m
+    cpus: 0.75
+
+  regression-docker:
+    profiles: ["regression"]
+    mem_limit: 3g
+    cpus: 2.0
+
+  release-agent:
+    build:
+      network: host
+    profiles: ["release"]
+    mem_limit: 1g
+    cpus: 0.75
+
+  release-docker:
+    profiles: ["release"]
+    mem_limit: 3g
+    cpus: 2.0
+
+  deploy-dev-agent:
+    build:
+      network: host
+    profiles: ["deploy-dev"]
+    mem_limit: 768m
+    cpus: 0.5
+
+  deploy-dev-docker:
+    profiles: ["deploy-dev"]
+    mem_limit: 3g
+    cpus: 1.5
+
+  deploy-test-agent:
+    build:
+      network: host
+    profiles: ["deploy-test"]
+    mem_limit: 768m
+    cpus: 0.5
+
+  deploy-test-docker:
+    profiles: ["deploy-test"]
+    mem_limit: 3g
+    cpus: 1.5
+
+  registry:
+    mem_limit: 512m
+    cpus: 0.25
