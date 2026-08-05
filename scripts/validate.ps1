@@ -182,6 +182,7 @@ try {
     Assert-True ($paperPreloadScript -match 'docker save --output' -and $paperPreloadScript -match 'docker load --input' -and $paperPreloadScript -match 'trap cleanup EXIT') 'paper-server preloader transfers caches into DIND and always cleans temporary resources.'
     $paperRegressionTest = Get-Content -Raw -LiteralPath 'scripts\test-xhsmedium-regression-paper-server.sh'
     Assert-True ($paperRegressionTest -match 'P4_PAPER_SERVER_EVIDENCE' -and $paperRegressionTest -match '(?s)stage_count=.*?\[ "\$stage_count" = 11 \]' -and $paperRegressionTest -match 'SCM token was found') 'paper-server regression acceptance checks business evidence, exact stage count, cleanup, and Secret leakage.'
+    Assert-True (([regex]::Matches($paperRegressionTest, '--cookie-jar "\$cookie" --cookie "\$cookie"')).Count -eq 2) 'paper-server regression acceptance preserves the authenticated Jenkins crumb session for its trigger POST.'
 
     $composeText = Get-Content -Raw -LiteralPath 'compose.yaml'
     $controllerCompose = [regex]::Match($composeText, '(?ms)^  controller:.*?(?=^  build-agent:)').Value

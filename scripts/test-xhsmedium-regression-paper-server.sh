@@ -22,8 +22,9 @@ repo_root=$(CDPATH= cd -- "$script_dir/.." && pwd)
 base='http://127.0.0.1:8080'
 job="$base/job/XHSMedium/job/Regression/job/scheduled"
 auth=$(mktemp)
+cookie=$(mktemp)
 scan=$(mktemp -d)
-cleanup() { rm -f -- "$auth"; rm -rf -- "$scan"; }
+cleanup() { rm -f -- "$auth" "$cookie"; rm -rf -- "$scan"; }
 trap cleanup EXIT
 trap 'exit 130' INT TERM
 { printf 'machine 127.0.0.1 login admin password '; tr -d '\r\n' <"$repo_root/.secrets/jenkins_admin_password"; printf '\n'; } >"$auth"
@@ -36,8 +37,8 @@ if printf '%s' "$config" | grep -q 'TimerTrigger'; then
 fi
 next=$(curl -g --netrc-file "$auth" -fsS "$job/api/json?tree=nextBuildNumber" | sed -n 's/.*"nextBuildNumber":\([0-9][0-9]*\).*/\1/p')
 [ -n "$next" ] || { printf 'Could not resolve the next build number.\n' >&2; exit 69; }
-crumb=$(curl --netrc-file "$auth" -fsS "$base/crumbIssuer/api/xml?xpath=concat(//crumbRequestField,%22:%22,//crumb)")
-curl --netrc-file "$auth" -fsS -X POST -H "$crumb" \
+crumb=$(curl --netrc-file "$auth" --cookie-jar "$cookie" --cookie "$cookie" -fsS "$base/crumbIssuer/api/xml?xpath=concat(//crumbRequestField,%22:%22,//crumb)")
+curl --netrc-file "$auth" --cookie-jar "$cookie" --cookie "$cookie" -fsS -X POST -H "$crumb" \
     --data-urlencode 'BRANCH=dev' \
     --data-urlencode "GIT_SHA=$sha" \
     --data-urlencode "VALIDATION_SLOT_UTC=$slot" \
