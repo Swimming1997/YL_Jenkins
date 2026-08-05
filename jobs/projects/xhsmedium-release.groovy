@@ -25,9 +25,12 @@ pipeline {
         skipDefaultCheckout(true)
         disableConcurrentBuilds(abortPrevious: false)
         timeout(time: 90, unit: 'MINUTES')
-        buildDiscarder(logRotator(numToKeepStr: '20'))
+        buildDiscarder(logRotator(numToKeepStr: '20', artifactNumToKeepStr: '5'))
     }
     stages {
+        stage('Paper server resource gate') {
+            steps { paperServerResourceGate() }
+        }
         stage('Validate immutable input') {
             steps {
                 script {
@@ -191,7 +194,7 @@ pipeline {
 '''.stripIndent())
         }
     }
-    logRotator { numToKeep(20) }
+    logRotator { numToKeep(20); artifactNumToKeep(5) }
 }
 
 pipelineJob('XHSMedium/Release/approve') {
@@ -203,6 +206,8 @@ pipelineJob('XHSMedium/Release/approve') {
         cps {
             sandbox(true)
             script('''
+@Library('jenkins-platform-library') _
+
 pipeline {
     agent { label 'xhsmedium-release' }
     environment {
@@ -213,9 +218,12 @@ pipeline {
         skipDefaultCheckout(true)
         disableConcurrentBuilds(abortPrevious: false)
         timeout(time: 10, unit: 'MINUTES')
-        buildDiscarder(logRotator(numToKeepStr: '30'))
+        buildDiscarder(logRotator(numToKeepStr: '20', artifactNumToKeepStr: '5'))
     }
     stages {
+        stage('Paper server resource gate') {
+            steps { paperServerResourceGate() }
+        }
         stage('Load existing candidate') {
             steps {
                 script {
@@ -287,5 +295,5 @@ pipeline {
 '''.stripIndent())
         }
     }
-    logRotator { numToKeep(30) }
+    logRotator { numToKeep(20); artifactNumToKeep(5) }
 }

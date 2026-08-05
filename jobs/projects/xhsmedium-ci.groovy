@@ -25,7 +25,7 @@ pipeline {
         skipDefaultCheckout(true)
         disableConcurrentBuilds(abortPrevious: true)
         timeout(time: 45, unit: 'MINUTES')
-        buildDiscarder(logRotator(numToKeepStr: '20'))
+        buildDiscarder(logRotator(numToKeepStr: '20', artifactNumToKeepStr: '5'))
     }
     stages {
         stage('Resolve fixed SHA') {
@@ -156,6 +156,7 @@ pipeline {
     }
     logRotator {
         numToKeep(20)
+        artifactNumToKeep(5)
     }
     disabled(false)
 }
@@ -181,7 +182,7 @@ pipeline {
         skipDefaultCheckout(true)
         disableConcurrentBuilds()
         timeout(time: 3, unit: 'MINUTES')
-        buildDiscarder(logRotator(numToKeepStr: '30'))
+        buildDiscarder(logRotator(numToKeepStr: '20', artifactNumToKeepStr: '5'))
     }
     stages {
         stage('Check dev SHA') {
@@ -244,6 +245,6 @@ pipeline {
 '''.stripIndent())
         }
     }
-    logRotator { numToKeep(30) }
+    logRotator { numToKeep(20); artifactNumToKeep(5) }
     disabled(false)
 }

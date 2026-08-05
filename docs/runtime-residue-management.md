@@ -20,9 +20,9 @@
 | 依赖缓存 | `xhsmedium-deps-<sha>-{backend,frontend,runner}` | 有界保留 | 保留当前验收 SHA 和上一已验证 SHA；更旧 SHA 在无运行引用后删除 |
 | 固定输入镜像 | 锁定 MySQL、Node、Playwright 镜像 | 按 digest 保留 | 只有锁定 digest 更新并完成新基线后才删除旧输入 |
 | DIND BuildKit cache | 专用 Regression/Release/Deploy DIND 构建层 | 有界保留 | 目标不超过 4 GiB；超过 8 GiB或进入磁盘告警水位时清理专用 daemon cache |
-| Jenkins 构建记录 | Console、result、description、duration | 有界保留 | 当前构建记录保留 20 条；明确 pin 的验收基线除外 |
-| Jenkins Artifact | 结构化证据、日志、报告、截图 | 有界保留 | 目标保留最近 5 个完整 Artifact；更早构建保留 Console/结果元数据 |
-| Playwright trace | `playwright*-report/data/*.zip` | 严格有界 | 仅保留最近 2 个仍需诊断的失败 trace，最长 7 天；结案后删除 trace，保留 JSON、日志和截图 |
+| Jenkins 构建记录 | Console、result、description、duration | 有界保留 | CI、Regression、Release、Deploy 和 Maintenance 构建记录保留 20 条；明确 Keep Forever/pin 的验收基线除外 |
+| Jenkins Artifact | 结构化证据、日志、报告、截图 | 有界保留 | 最近 5 个构建保留完整 Artifact；更早构建保留 Console/结果元数据；pin 基线除外 |
+| Playwright trace | `artifacts/test-runs/<runId>/playwright*-report/data/*.zip` | 严格有界 | 非 pin 构建仅保留最近 2 个仍需诊断的失败 trace，最长 7 天；删除 trace 时保留 JSON、日志和截图 |
 | 持久平台/业务数据 | Jenkins Home、Registry、Postgres、ClickHouse、MinIO、备份 | 禁止日常删除 | 按各自备份、恢复和 Registry 保留政策治理 |
 
 ## 单次运行清理契约
@@ -46,8 +46,8 @@ Job 只在业务 Stage 通过、Requirement 无 partial/blocked、cleanup 成功
 |---:|---|---|
 | `>= 30 GiB` | 正常 | 允许一个重型 profile；执行每轮标准 cleanup |
 | `25–30 GiB` | 预警 | 禁止并行重型任务；完成后审计 DIND、Artifact 和 cache 增量 |
-| `20–25 GiB` | 严重 | 不启动新重型任务；先清理精确 run 镜像、过期 trace 和专用 DIND cache |
-| `< 20 GiB` | 紧急 | 保持所有重型 profile 停止；只执行有清单的精确清理并升级处理 |
+| `20–25 GiB` | 严重 | 自动拒绝新的 Regression、Release 和 Deploy；先清理精确 run 镜像、过期 trace 和专用 DIND cache |
+| `< 20 GiB` | 紧急 | 自动拒绝重型任务并保持所有重型 profile 停止；只执行有清单的精确 Maintenance 并升级处理 |
 
 内存仍要求至少 4 GiB available。磁盘与内存任一不满足时，排队或拒绝启动不属于测试失败，也不得生成虚假 Coverage。
 
@@ -108,10 +108,16 @@ RESIDUE_CLEANUP_EVIDENCE scope=<job/runId/dind> removed_images=<n> removed_trace
 
 ### RRM-D4：保留策略与水位门禁
 
-- 状态：待开发。
+- 状态：D4.1 本地开发验证完成（2026-08-05）；尚未提交、推送或在 paper-server 应用。
 - 范围：Job DSL build/artifact discarder、失败 trace/Artifact 保留、重型 Job 启动前检查、验证脚本和告警文档。
-- 结果：构建记录 20、完整 Artifact 5、失败 trace 2/7 天；低于 25 GiB 告警，低于 20 GiB拒绝重型任务。
+- 结果：构建记录 20、完整 Artifact 5、失败 trace 2/7 天；25–30 GiB告警且拒绝并发执行，低于 25 GiB拒绝新的重型任务，低于 20 GiB进入紧急状态。
 - 验证：模拟水位、过期 Artifact、失败/中断 cleanup 和 Agent 重连后，均不误删当前或其他项目资源。
+
+D4.1 使用 Jenkins Controller 自身的 `DiskSpaceMonitor`遥测判断 Jenkins Home 所在文件系统可用字节，不向 Agent 暴露宿主目录或 Docker Socket。Regression、Release 和 Deploy 在首个工作负载 Stage 前执行门禁；专用 DIND Maintenance 不进入该门禁，确保低磁盘时仍可通过原有队列、executor、目标容器和明文确认门禁执行精确恢复。
+
+失败 trace 由受信任 Shared Library 在 Artifact 归档后按固定 Job、Build number 和完整规范化路径收敛，只允许删除 `artifacts/test-runs/<runId>/playwright*-report/data/*.zip`。成功构建、超过 7 天的失败构建和最近两份之外的失败构建不保留 trace；结构化 JSON、日志、截图和 Keep Forever/pin 构建不进入删除集合。
+
+D4.1 本地证据包括静态配置验证、16 个 Shared Library测试、五组30/25/20 GiB边界容器测试，以及独立 Jenkins Home中的 JCasC/Job DSL运行时加载。运行时确认11个受管 Job采用20/5策略、5个重型 Job含资源门禁、4个DIND Maintenance Job保持豁免，并读取到真实 `DiskSpaceMonitor` API结构；隔离 fixture 连续完成22次无executor构建，最终保留pin构建1和最近20个普通构建，普通构建2已收敛。首次隔离测试发现`docker compose down --volumes`会枚举Compose文件中的共享显式命名卷；现有卷均因正在使用而拒绝删除，未发生数据损失。测试已改为仅删除随机命名的Controller、Jenkins Home卷和control网络，复测零残留。后续两次测试定义失败分别来自首次磁盘遥测尚未采样和pin请求重定向认证，两者均保持失败并完成隔离清理；有界等待与不跟随重定向修正后最终验收通过。
 
 ## 2026-08-05 paper-server 基线记录
 

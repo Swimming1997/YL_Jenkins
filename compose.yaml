@@ -13,6 +13,7 @@ services:
       - "127.0.0.1:${JENKINS_HTTP_PORT:-8080}:8080"
     environment:
       CASC_JENKINS_CONFIG: /var/jenkins_home/casc_configs
+      PAPER_SERVER_RESOURCE_MODE: "${PAPER_SERVER_RESOURCE_MODE:-false}"
       JENKINS_PUBLIC_URL: ${JENKINS_URL:-http://127.0.0.1:8080/}
       JENKINS_LIBRARY_URL: ${JENKINS_LIBRARY_URL:-https://github.com/Swimming1997/YL_Jenkins.git}
       JAVA_OPTS: >-

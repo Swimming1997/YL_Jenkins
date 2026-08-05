@@ -10,7 +10,9 @@ def deploymentEnvironments = [
 ]
 
 deploymentEnvironments.each { environmentName, config ->
-    def pipelineSource = '''
+def pipelineSource = '''
+@Library('jenkins-platform-library') _
+
 pipeline {
     agent { label '__DEPLOY_LABEL__' }
     environment {
@@ -24,9 +26,12 @@ pipeline {
         skipDefaultCheckout(true)
         disableConcurrentBuilds(abortPrevious: false)
         timeout(time: 25, unit: 'MINUTES')
-        buildDiscarder(logRotator(numToKeepStr: '30'))
+        buildDiscarder(logRotator(numToKeepStr: '20', artifactNumToKeepStr: '5'))
     }
     stages {
+        stage('Paper server resource gate') {
+            steps { paperServerResourceGate() }
+        }
         stage('Validate deployment approval') {
             steps {
                 script {
@@ -206,6 +211,6 @@ pipeline {
                 script(pipelineSource)
             }
         }
-        logRotator { numToKeep(30) }
+        logRotator { numToKeep(20); artifactNumToKeep(5) }
     }
 }

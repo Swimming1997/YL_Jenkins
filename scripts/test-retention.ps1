@@ -23,14 +23,25 @@ $retention = @(
     @{ Path = 'job/Platform/job/Validation/job/shared-library-smoke'; Count = 5 },
     @{ Path = 'job/Platform/job/Validation/job/build-agent-smoke'; Count = 10 },
     @{ Path = 'job/Platform/job/Validation/job/regression-agent-smoke'; Count = 10 },
-    @{ Path = 'job/XHSMedium/job/CI/job/read-only'; Count = 20 },
-    @{ Path = 'job/XHSMedium/job/CI/job/watch-dev'; Count = 30 },
-    @{ Path = 'job/XHSMedium/job/Regression/job/scheduled'; Count = 20 }
+    @{ Path = 'job/XHSMedium/job/CI/job/read-only'; Count = 20; Artifacts = 5 },
+    @{ Path = 'job/XHSMedium/job/CI/job/watch-dev'; Count = 20; Artifacts = 5 },
+    @{ Path = 'job/XHSMedium/job/Regression/job/scheduled'; Count = 20; Artifacts = 5 },
+    @{ Path = 'job/XHSMedium/job/Release/job/candidate'; Count = 20; Artifacts = 5 },
+    @{ Path = 'job/XHSMedium/job/Release/job/approve'; Count = 20; Artifacts = 5 },
+    @{ Path = 'job/XHSMedium/job/Deploy/job/dev'; Count = 20; Artifacts = 5 },
+    @{ Path = 'job/XHSMedium/job/Deploy/job/test'; Count = 20; Artifacts = 5 },
+    @{ Path = 'job/Platform/job/Maintenance/job/dind-regression'; Count = 20; Artifacts = 5 },
+    @{ Path = 'job/Platform/job/Maintenance/job/dind-release'; Count = 20; Artifacts = 5 },
+    @{ Path = 'job/Platform/job/Maintenance/job/dind-deploy-dev'; Count = 20; Artifacts = 5 },
+    @{ Path = 'job/Platform/job/Maintenance/job/dind-deploy-test'; Count = 20; Artifacts = 5 }
 )
 
 foreach ($job in $retention) {
     $config = (Invoke-WebRequest -UseBasicParsing -Uri "$BaseUrl/$($job.Path)/config.xml" -Headers $headers -TimeoutSec 20).Content
     Assert-True ($config -match "<numToKeep>$($job.Count)</numToKeep>") "$($job.Path) retains the configured $($job.Count) builds."
+    if ($job.ContainsKey('Artifacts')) {
+        Assert-True ($config -match "<artifactNumToKeep>$($job.Artifacts)</artifactNumToKeep>") "$($job.Path) retains the configured $($job.Artifacts) complete Artifact sets."
+    }
 }
 
 $regressionUrl = "$BaseUrl/job/XHSMedium/job/Regression/job/scheduled/$RegressionBuild"

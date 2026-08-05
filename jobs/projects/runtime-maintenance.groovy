@@ -21,7 +21,7 @@ pipeline {
         skipDefaultCheckout(true)
         disableConcurrentBuilds(abortPrevious: false)
         timeout(time: 15, unit: 'MINUTES')
-        buildDiscarder(logRotator(numToKeepStr: '20'))
+        buildDiscarder(logRotator(numToKeepStr: '20', artifactNumToKeepStr: '5'))
     }
     stages {
         stage('Validate request') {
@@ -115,7 +115,7 @@ pipeline {
                 script(pipelineSource)
             }
         }
-        logRotator { numToKeep(20) }
+        logRotator { numToKeep(20); artifactNumToKeep(5) }
         disabled(false)
     }
 }

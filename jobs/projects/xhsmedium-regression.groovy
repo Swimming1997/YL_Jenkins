@@ -22,6 +22,7 @@ pipelineJob('XHSMedium/Regression/scheduled') {
 pipeline {
     agent { label 'xhsmedium-regression' }
     environment {
+        JENKINS_INTERNAL_URL = 'http://controller:8080'
         XHSMEDIUM_REPOSITORY = 'https://github.com/MuFannnn/xhsmedium.git'
         CI = 'true'
         GIT_TERMINAL_PROMPT = '0'
@@ -38,9 +39,12 @@ pipeline {
         skipDefaultCheckout(true)
         disableConcurrentBuilds(abortPrevious: false)
         timeout(time: 7, unit: 'HOURS')
-        buildDiscarder(logRotator(numToKeepStr: '20'))
+        buildDiscarder(logRotator(numToKeepStr: '20', artifactNumToKeepStr: '5'))
     }
     stages {
+        stage('Paper server resource gate') {
+            steps { paperServerResourceGate() }
+        }
         stage('Resolve fixed SHA') {
             steps {
                 script {
@@ -199,6 +203,7 @@ test \"\\$(docker image inspect --format '{{index .Config.Labels \\\"xhsmedium.p
                 } finally {
                     try {
                         archiveArtifacts artifacts: 'scheduled-regression.log,offline-dependency-cache.log,artifacts/test-runs/**,artifacts/regression/**', allowEmptyArchive: true, fingerprint: true
+                        retainRegressionTraces(result: currentBuild.currentResult)
                     } finally {
                         try {
                             sh(
@@ -225,6 +230,6 @@ test \"\\$(docker image inspect --format '{{index .Config.Labels \\\"xhsmedium.p
 '''.stripIndent())
         }
     }
-    logRotator { numToKeep(20) }
+    logRotator { numToKeep(20); artifactNumToKeep(5) }
     disabled(false)
 }

@@ -12,7 +12,11 @@ docker compose ps
 
 ## 运行残留治理
 
-运行资源、DIND 镜像、依赖缓存、Artifact、trace 和持久数据的分类、保留上限、磁盘水位、清理顺序与证据格式统一遵循[`runtime-residue-management.md`](runtime-residue-management.md)。日常检查不能只验证容器和 Workspace；还必须检查专用 DIND 的历史 run 镜像、BuildKit cache 与 Jenkins 大型 Artifact。低于 25 GiB进入预警，低于 20 GiB时禁止启动新的重型任务。
+运行资源、DIND 镜像、依赖缓存、Artifact、trace 和持久数据的分类、保留上限、磁盘水位、清理顺序与证据格式统一遵循[`runtime-residue-management.md`](runtime-residue-management.md)。日常检查不能只验证容器和 Workspace；还必须检查专用 DIND 的历史 run 镜像、BuildKit cache 与 Jenkins 大型 Artifact。30 GiB以下进入预警并要求串行，25 GiB以下自动拒绝新的 Regression、Release 和 Deploy，20 GiB以下进入紧急状态。
+
+重型 Pipeline 通过只读 Jenkins API读取 Controller `DiskSpaceMonitor`，输出 `RESOURCE_GATE_EVIDENCE`后才进入业务 Stage。门禁缺少遥测时失败关闭；不得通过参数伪造可用空间。`Platform/Maintenance/dind-*`不调用该资源门禁，以保留低磁盘恢复路径，但仍必须满足其原有空闲和精确目标门禁。
+
+业务和维护 Job 的普通构建记录上限为 20，完整 Artifact 上限为 5；Keep Forever构建豁免。Regression 在归档后输出 `TRACE_RETENTION_EVIDENCE`，非 pin 的 Playwright trace 只保留最近两个失败构建且最长 7 天，其他 JSON、日志和截图继续遵守 Artifact保留策略。
 
 专用 DIND 维护使用 `Platform/Maintenance/dind-{regression,release,deploy-dev,deploy-test}`。`AUDIT`为默认只读模式；`APPLY`必须输入 `APPLY_DEDICATED_DIND_MAINTENANCE`。Regression 还必须提供当前和上一已验证完整 SHA，Job 会使用只读 Jenkins API 凭据核对最近成功回归的不同 SHA 顺序。执行前只启动目标 profile，确认队列为空；执行后停止 profile并保存 `DIND_MAINTENANCE_EVIDENCE`。
 

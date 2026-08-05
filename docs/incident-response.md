@@ -30,7 +30,8 @@
 1. 停止新的重型任务，记录 `df`、Docker、专用 DIND、Jenkins Home 和最大 Artifact 占用。
 2. 按[`runtime-residue-management.md`](runtime-residue-management.md)区分零残留对象、有界证据/缓存和禁止日常删除的持久数据。
 3. 先处理精确 run 镜像；再使用对应 `Platform/Maintenance/dind-*`执行 `AUDIT`，审核候选后以明确确认运行 `APPLY`，处理旧 SHA 缓存和专用 DIND BuildKit cache；每步重新测量可用空间。
-4. 过期 trace、Artifact 和 Jenkins Build 只能按 RRM-D4 的记录级保留策略处理，不得由 DIND Maintenance Job 删除。
+4. 过期 trace、Artifact 和 Jenkins Build 只能按 RRM-D4 的固定 Job、Build number和 Artifact相对路径策略处理，不得由 DIND Maintenance Job删除；Keep Forever/pin构建必须跳过。
+5. 查看最近的 `RESOURCE_GATE_EVIDENCE`和`TRACE_RETENTION_EVIDENCE`；遥测缺失、越界路径或删除失败均按基础设施失败处理，不得手工改成成功。
 5. 保留当前 SHA、唯一成功基线、首个失败、结构化 JSON、日志和截图；禁止宿主全局 prune。
 6. 清理后确认重型 profile 已停止、Jenkins 队列为空、基线服务健康，并记录 `RESIDUE_CLEANUP_EVIDENCE`。
 
