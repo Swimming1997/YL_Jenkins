@@ -5,6 +5,7 @@ jobs:
   - file: /var/jenkins_home/job-dsl/projects/xhsmedium-regression.groovy
   - file: /var/jenkins_home/job-dsl/projects/xhsmedium-release.groovy
   - file: /var/jenkins_home/job-dsl/projects/xhsmedium-deploy.groovy
+  - file: /var/jenkins_home/job-dsl/projects/runtime-maintenance.groovy
 
 unclassified:
   globalLibraries:

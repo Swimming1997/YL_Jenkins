@@ -14,6 +14,10 @@ docker compose ps
 
 运行资源、DIND 镜像、依赖缓存、Artifact、trace 和持久数据的分类、保留上限、磁盘水位、清理顺序与证据格式统一遵循[`runtime-residue-management.md`](runtime-residue-management.md)。日常检查不能只验证容器和 Workspace；还必须检查专用 DIND 的历史 run 镜像、BuildKit cache 与 Jenkins 大型 Artifact。低于 25 GiB进入预警，低于 20 GiB时禁止启动新的重型任务。
 
+专用 DIND 维护使用 `Platform/Maintenance/dind-{regression,release,deploy-dev,deploy-test}`。`AUDIT`为默认只读模式；`APPLY`必须输入 `APPLY_DEDICATED_DIND_MAINTENANCE`。Regression 还必须提供当前和上一已验证完整 SHA，Job 会使用只读 Jenkins API 凭据核对最近成功回归的不同 SHA 顺序。执行前只启动目标 profile，确认队列为空；执行后停止 profile并保存 `DIND_MAINTENANCE_EVIDENCE`。
+
+Maintenance 只能对固定 Agent 所连接的专用 TLS DIND执行。AUDIT 可以只读报告运行容器；APPLY 遇到目标运行容器或其他 Jenkins executor 活跃时必须拒绝。镜像命名越界、protected image 丢失或 APPLY 后 cache 仍超过 4 GiB时，Job 必须失败。不得从宿主执行等价的无范围 prune。
+
 ## 启停和重建
 
 ```powershell

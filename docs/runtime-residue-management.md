@@ -93,25 +93,28 @@ RESIDUE_CLEANUP_EVIDENCE scope=<job/runId/dind> removed_images=<n> removed_trace
 
 ### RRM-D2：每轮运行镜像自动清理
 
-- 状态：实现完成，待固定 SHA 的 paper-server 全量回归验收。
+- 状态：完成。paper-server 已使用固定 SHA 完成成功、失败、超时和人工中断全量回归，四轮运行镜像残留均为 0。
 - 范围：Regression Job、精确 cleanup helper、静态验证与成功/失败/中断测试。
 - 结果：Artifact 归档后删除本轮精确 `xhsmedium-test-<runId>-*`镜像；保留固定输入与允许窗口内的依赖缓存。
 - 门禁：合法项目在镜像尚未生成时允许空集合并输出 `removed_images=0`；候选镜像超出三种允许角色时删除前失败关闭；不得调用全局 prune。
 
-### RRM-D3：专用 DIND 维护任务
+### RRM-D3.1：专用 DIND 维护任务
 
-- 状态：待开发。
-- 范围：只读审计脚本、管理员触发的维护 Job、专用 Regression/Release/Deploy DIND。
-- 结果：报告并清理超限 BuildKit cache、旧 SHA 缓存和已结案 trace，输出结构化清理证据。
-- 门禁：Jenkins 队列为空、对应 profile 无运行 Job、保留清单已生成且持久数据不在作用域。
+- 状态：实现和本地验证完成，待 paper-server Docker 验收。
+- 范围：只读审计 helper、四个管理员触发的 Maintenance Job、专用 Regression/Release/Deploy DIND。
+- 结果：报告各专用 DIND 的镜像和 BuildKit cache；Regression 只删除当前及上一已验证 SHA 之外的精确依赖缓存；将目标 DIND BuildKit cache 维护到不超过 4 GiB并输出结构化证据。
+- 门禁：Jenkins 队列为空、除当前 Maintenance 外无其他执行器、目标 DIND 无运行容器、APPLY 明文确认、Regression SHA 窗口通过成功构建记录验证。
+- 边界：Maintenance Job 只通过固定 Agent 的 TLS `DOCKER_HOST`访问对应 DIND；不访问宿主 Docker Socket，不删除任何非候选镜像、Jenkins Build、Artifact 或 trace。
 
 ### RRM-D4：保留策略与水位门禁
 
 - 状态：待开发。
-- 范围：Job DSL build/artifact discarder、重型 Job 启动前检查、验证脚本和告警文档。
+- 范围：Job DSL build/artifact discarder、失败 trace/Artifact 保留、重型 Job 启动前检查、验证脚本和告警文档。
 - 结果：构建记录 20、完整 Artifact 5、失败 trace 2/7 天；低于 25 GiB 告警，低于 20 GiB拒绝重型任务。
 - 验证：模拟水位、过期 Artifact、失败/中断 cleanup 和 Agent 重连后，均不误删当前或其他项目资源。
 
 ## 2026-08-05 paper-server 基线记录
 
 本次人工治理将可用磁盘从约 20 GiB恢复到约 34 GiB：删除专用 Regression DIND 中 32 个历史运行/旧缓存镜像、清空其 BuildKit cache，并删除构建 5–12 的 18 个已结案 Playwright trace（约 1.12 GB）。最终 SHA `b48c1e8f98df9a085452d8746cba024d8e263fea`的三类依赖缓存、固定输入镜像、构建 13 的成功证据、失败日志、JSON 和截图均保留；Langfuse、New API、数据库和 Registry 未进入清理范围。
+
+RRM-D2 全量验收使用同一固定 SHA 完成构建 14–17：成功、1 分钟 timeout、管理员中断和 backend 故障注入均输出 `RESIDUE_CLEANUP_EVIDENCE`，对应 Compose project 的容器、卷、网络、运行镜像、Workspace 和临时文件均为 0。验收后 Regression profile 已停止；BuildKit cache 约 5.68 GB，作为 RRM-D3.1 的首个维护验收对象保留。

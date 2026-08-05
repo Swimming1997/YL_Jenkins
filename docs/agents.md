@@ -24,6 +24,8 @@ Agent SSH 端口只存在于 Docker `control`网络，不映射到宿主机。P2
 
 Agent Workspace 使用逻辑容量 2 GiB 的 tmpfs，以高于 Jenkins 默认磁盘阈值；tmpfs 不预分配内存，实际使用仍受每个 Agent 的 1 GiB 容器内存上限约束。
 
+RRM-D3.1 为四个专用 DIND 各生成一个 `Platform/Maintenance/dind-*` Job。Job 固定运行在对应 Agent，通过已有 TLS `DOCKER_HOST`维护该 Agent 唯一可见的 DIND；只读 Jenkins API 凭据仅在空闲门禁 Stage 注入，用于检查队列、executor 和 Regression 成功 SHA 窗口，随后不持久保存。Maintenance 不获得宿主 Docker Socket、管理员凭据、Registry Secret 或部署环境 Secret。
+
 ## 验证
 
 ```powershell

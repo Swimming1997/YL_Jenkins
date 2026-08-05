@@ -47,7 +47,7 @@ Regression Agent 为准备 sealed plan 执行的三个 `npm ci`复用 CI 的有�
 
 automation 自身的 `clean`完成后，Jenkins post 仍会对固定 Compose project 执行 `down --volumes --remove-orphans`。人工中断可能与 `docker compose run --rm`创建 one-off 容器并发，因此平台还会按精确 `com.docker.compose.project`标签重试移除该 project 的容器、卷和网络；连续三次观察为空才输出 `P4_EXACT_PROJECT_CLEANUP_OK`。辅助脚本只接受 `xhsmedium-test-scheduled-*`，禁止全局 prune，未收敛时让 post 失败。
 
-Compose cleanup 不等于完整的磁盘 cleanup。业务证据归档后，RRM-D2 helper 会删除本轮精确 `xhsmedium-test-scheduled-<runId>-{backend,frontend,runner}`运行镜像，拒绝越界名称并输出零残留证据；该行为仍待固定 SHA 的 paper-server 全量回归验收。允许的 SHA 依赖缓存窗口、DIND BuildKit cache、失败 trace 和 Jenkins Artifact 的有界保留由后续维护任务治理，统一规则见[`runtime-residue-management.md`](runtime-residue-management.md)。
+Compose cleanup 不等于完整的磁盘 cleanup。业务证据归档后，RRM-D2 helper 会删除本轮精确 `xhsmedium-test-scheduled-<runId>-{backend,frontend,runner}`运行镜像，拒绝越界名称并输出零残留证据；该行为已通过固定 SHA 的 paper-server 成功、失败、超时和人工中断全量回归。允许的 SHA 依赖缓存窗口与 DIND BuildKit cache 由 RRM-D3.1 Maintenance Job 治理；失败 trace 和 Jenkins Artifact 的有界保留属于 RRM-D4，统一规则见[`runtime-residue-management.md`](runtime-residue-management.md)。
 
 可重复验收命令：
 

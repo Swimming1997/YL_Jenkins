@@ -102,6 +102,12 @@ paper-server 的手工验收槽使用同一固定 SHA，并要求偶数 UTC 小�
 
 启动下一个 profile 前，必须确认上一个 Agent/DIND 已停止且 Jenkins 队列为空。禁止使用无范围的 `docker system prune`，也不得对共享主机执行 `docker compose down --volumes`。
 
+## 专用 DIND 维护
+
+磁盘进入预警水位或专用 DIND BuildKit cache 超过 4 GiB时，只启动一个目标 profile，并运行对应的 `Platform/Maintenance/dind-*` Job。先使用 `MODE=AUDIT`检查候选；`MODE=APPLY`还必须提供精确确认字符串。Regression Job 的当前和上一 SHA 必须与最近两个不同的成功固定 SHA 回归记录一致。
+
+Maintenance Job 的 AUDIT 可以只读报告目标 DIND 的运行容器；APPLY 会拒绝非空 Jenkins 队列、其他活动 executor、目标 DIND 运行容器和越界镜像名称。它只通过目标 Agent 的 TLS Docker 连接执行，不挂载宿主 Docker Socket。验收结束后按“串行 profile 操作”停止 Agent/DIND，并重新记录宿主磁盘、DIND cache、protected images 和 Jenkins 队列。
+
 ## 验证与水位
 
 基线检查：

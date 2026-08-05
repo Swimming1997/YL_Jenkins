@@ -6,6 +6,10 @@ folder('Platform/Validation') {
     description('Non-business smoke checks for platform configuration.')
 }
 
+folder('Platform/Maintenance') {
+    description('Explicitly confirmed maintenance for isolated platform resources.')
+}
+
 folder('XHSMedium') {
     description('XHSMedium pipelines. Jobs are introduced in later phases.')
 }
@@ -21,4 +25,3 @@ folder('XHSMedium') {
         description(descriptionText)
     }
 }
-
