@@ -111,6 +111,44 @@ verify_host_cache() {
     printf 'PASS: existing host cache verified: %s\n' "$image"
 }
 
+dependency_cache_probe() {
+    case "$1" in
+        backend)
+            printf '%s' 'set -e; cd /app/backend; npm ci --offline --no-audit --no-fund >/dev/null 2>&1; npm ls --depth=0 >/dev/null 2>&1'
+            ;;
+        frontend)
+            printf '%s' 'set -e; cd /app/frontend; npm ci --offline --no-audit --no-fund >/dev/null 2>&1; npm ls --depth=0 >/dev/null 2>&1'
+            ;;
+        runner)
+            printf '%s' 'set -e; npm ls --prefix /workspace/backend --depth=0 >/dev/null 2>&1; npm ls --prefix /workspace/frontend --depth=0 >/dev/null 2>&1; npm ls --prefix /workspace/automation --depth=0 >/dev/null 2>&1'
+            ;;
+        *)
+            printf 'Unknown dependency cache role: %s\n' "$1" >&2
+            return 64
+            ;;
+    esac
+}
+
+verify_host_cache_ready() {
+    local role=$1 image="$cache_prefix-$1:latest" probe=''
+    probe=$(dependency_cache_probe "$role")
+    docker run --rm --network none "$image" sh -lc "$probe" >/dev/null || {
+        printf 'Host dependency cache is not offline-ready for %s. Refusing to import it.\n' "$image" >&2
+        return 1
+    }
+    printf 'PASS: host dependency cache is offline-ready: %s\n' "$image"
+}
+
+verify_dind_cache_ready() {
+    local role=$1 image="$cache_prefix-$1:latest" probe=''
+    probe=$(dependency_cache_probe "$role")
+    docker exec "$dind_id" docker run --rm --network none "$image" sh -lc "$probe" >/dev/null || {
+        printf 'DIND dependency cache is not offline-ready for %s.\n' "$image" >&2
+        return 1
+    }
+    printf 'PASS: DIND dependency cache is offline-ready: %s\n' "$image"
+}
+
 if [ "$verify_only" = false ]; then
     for index in "${!input_refs[@]}"; do
         verify_host_input "${input_refs[$index]}" "${input_ids[$index]}"
@@ -163,6 +201,10 @@ EOF
         done
     fi
 
+    for role in backend frontend runner; do
+        verify_host_cache_ready "$role"
+    done
+
     docker save --output "$image_archive" \
         'docker.m.daocloud.io/library/mysql:8.4' \
         'docker.m.daocloud.io/library/node:20-bookworm-slim' \
@@ -183,6 +225,7 @@ for role in backend frontend runner; do
         exit 65
     }
     printf 'PASS: %s is loaded for %s.\n' "$image" "$sha"
+    verify_dind_cache_ready "$role"
 done
 
 for image in 'docker.m.daocloud.io/library/mysql:8.4' 'docker.m.daocloud.io/library/node:20-bookworm-slim' 'mcr.microsoft.com/playwright:v1.59.1-noble'; do

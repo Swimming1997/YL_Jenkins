@@ -74,7 +74,9 @@ docker compose -f compose.yaml -f compose.paper-server.yaml --profile deploy-tes
 docker compose -f compose.yaml -f compose.paper-server.yaml stop deploy-test-agent deploy-test-docker
 ```
 
-首次执行某个固定 SHA 前，先启动 Regression profile，再由 Linux 预加载器以只读 SCM Secret 获取该精确提交。预加载器仅在临时、被 Git 忽略的目录保存源码快照；依赖镜像在宿主机 Docker 中构建并导入隔离 DIND，宿主机不安装 Node.js、PowerShell 或项目运行时。缺失的固定输入镜像只在显式传入 `--pull-inputs`时拉取，拉取后仍必须匹配锁定 image ID：
+首次执行某个固定 SHA 前，先启动 Regression profile，再由 Linux 预加载器以只读 SCM Secret 获取该精确提交。预加载器仅在临时、被 Git 忽略的目录保存源码快照；依赖镜像在宿主机 Docker 中构建并导入隔离 DIND，宿主机不安装 Node.js、PowerShell 或项目运行时。缺失的固定输入镜像只在显式传入 `--pull-inputs`时拉取，拉取后仍必须匹配锁定 image ID。
+
+每个依赖镜像在导入前和导入 DIND 后都必须通过无网络容器探测。Backend 与 Frontend 探测会重新执行一次 `npm ci --offline`并检查顶层依赖，Runner 探测会检查三个工作区的顶层依赖；任何镜像即使 SHA/role 标签正确，只要离线依赖不完整也会失败关闭，禁止触发 Regression Job：
 
 ```bash
 ./scripts/preload-xhsmedium-regression.sh \
