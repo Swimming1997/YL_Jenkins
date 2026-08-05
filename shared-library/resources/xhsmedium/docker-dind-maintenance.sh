@@ -135,7 +135,7 @@ if [[ $mode == APPLY ]]; then
         removed_logical_bytes=$((removed_logical_bytes + image_size))
     done
     if (( before_cache_bytes > cache_limit_bytes )); then
-        "$real_docker" builder prune --force --reserved-space "${cache_limit_bytes}B" >/dev/null
+        "$real_docker" builder prune --all --force --max-used-space "${cache_limit_bytes}B" >/dev/null
     fi
 fi
 
