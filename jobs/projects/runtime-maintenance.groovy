@@ -71,7 +71,7 @@ pipeline {
                 sh(
                     'set -eu\\n' +
                     'chmod 700 .docker-dind-maintenance.sh\\n' +
-                    './.docker-dind-maintenance.sh "$DIND_MAINTENANCE_TARGET" "$MODE" "$CURRENT_VALIDATED_SHA" "$PREVIOUS_VALIDATED_SHA" "$CONFIRMATION"\\n'
+                    './.docker-dind-maintenance.sh "$DIND_MAINTENANCE_TARGET" "$MODE" "${CURRENT_VALIDATED_SHA:-}" "${PREVIOUS_VALIDATED_SHA:-}" "${CONFIRMATION:-}"\\n'
                 )
             }
         }
