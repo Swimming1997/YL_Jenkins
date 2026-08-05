@@ -79,6 +79,13 @@ pipeline {
     post {
         always {
             sh 'rm -f .docker-dind-maintenance.sh queue.json executors.json regression-builds.json'
+            script {
+                def maintenanceTmp = "${env.WORKSPACE}@tmp"
+                if (!(maintenanceTmp ==~ /\/home\/jenkins\/agent\/workspace\/Platform\/Maintenance\/dind-(regression|release|deploy-dev|deploy-test)@tmp/)) {
+                    error("Refusing unsafe Maintenance temporary cleanup path: ${maintenanceTmp}")
+                }
+                dir(maintenanceTmp) { deleteDir() }
+            }
             deleteDir()
         }
     }
