@@ -33,7 +33,7 @@ runner 镜像内的三个 `node_modules`会被 Compose 命名卷覆盖。每个 
 
 XHSMedium 的初始化脚本会被 MySQL 官方 entrypoint `source`，其中的 `set -u`会继续影响官方脚本。平台从 fixed-SHA 仓库外附加一个极薄 wrapper，由它在独立 Bash 子进程执行原始初始化脚本；这样保留原始数据库名校验、schema 和 seed，同时避免 Shell option 泄漏。平台不修改 fixed-SHA Workspace、数据库结构或种子数据。
 
-MySQL 8.4 锁定镜像的临时初始化服务器使用 `/var/lib/mysql/mysql.sock`。wrapper 只为原始脚本的子 Bash 设置 `MYSQL_UNIX_PORT`指向该 socket；不改写原始脚本，也不把变量或 Shell option 写回官方 entrypoint。
+MySQL 8.4 锁定镜像的临时初始化服务器使用 `/var/lib/mysql/mysql.sock`。wrapper 只在独立子 Bash 中定义临时 `mysql()`函数，为原始脚本的 mysql 客户端调用附加该 socket；不改写原始脚本，也不把函数或 Shell option 写回官方 entrypoint。
 
 依赖锁文件或待测 SHA 更新后必须先重新执行预加载。预加载只使用宿主机 Docker 客户端，不向 Agent 挂载 Docker Socket；临时源码快照和 tar 无论成功失败都会删除。
 

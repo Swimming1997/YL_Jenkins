@@ -167,7 +167,7 @@ try {
     Assert-True ($projectCleanup -match '\^xhsmedium-test-scheduled-' -and $projectCleanup -match 'label=com\.docker\.compose\.project=\$project' -and $projectCleanup -notmatch '(?i)system\s+prune') 'Project cleanup helper permits only scheduled projects and selects resources by exact Compose label.'
     Assert-True ($xhsmediumRegression -match 'XHSMEDIUM_PROJECT_CLEANUP_PATH' -and $xhsmediumRegression -match 'cleanup_status=0' -and $xhsmediumRegression -match 'exit "\$cleanup_status"') 'XHSMedium regression retries exact project cleanup and propagates cleanup failure.'
     $mysqlInitWrapper = Get-Content -Raw -LiteralPath 'shared-library\resources\xhsmedium\mysql-init-wrapper.sh'
-    Assert-True ($mysqlInitWrapper.Trim() -eq "#!/bin/sh`nMYSQL_UNIX_PORT=`"`${MYSQL_UNIX_PORT:-/var/lib/mysql/mysql.sock}`" bash /automation/original-initialize-database.sh") 'MySQL compatibility wrapper only supplies the image socket path to the original script child shell.'
+    Assert-True ($mysqlInitWrapper.Trim() -eq "#!/bin/sh`nbash -c 'mysql() { command mysql --socket=/var/lib/mysql/mysql.sock `"`$@`"; }; . /automation/original-initialize-database.sh'") 'MySQL compatibility wrapper only supplies the image socket argument while sourcing the original script in a child shell.'
     $slotShim = Get-Content -Raw -LiteralPath 'shared-library\resources\xhsmedium\scheduled-slot-shim.cjs'
     Assert-True ($slotShim -match 'delete process\.env\.NODE_OPTIONS' -and $slotShim -match 'Invalid XHSMEDIUM_VALIDATION_SLOT_UTC') 'Scheduled slot shim validates its input and does not affect child Node processes.'
 
