@@ -1,7 +1,5 @@
 package org.swimming1997.jenkins
 
-import groovy.io.FileType
-
 import java.nio.file.Path
 import java.util.regex.Pattern
 
@@ -85,14 +83,26 @@ class TraceRetentionPolicy {
         }
         Path rootPath = artifactsRoot.canonicalFile.toPath()
         List<File> traces = []
-        artifactsRoot.eachFileRecurse(FileType.FILES) { File candidate ->
-            Path candidatePath = candidate.canonicalFile.toPath()
-            if (!candidatePath.startsWith(rootPath)) {
-                throw new IllegalStateException("Trace candidate escapes Artifact root: ${candidate}")
+        List<File> pending = [artifactsRoot]
+        while (!pending.isEmpty()) {
+            File directory = pending.remove(pending.size() - 1)
+            File[] children = directory.listFiles()
+            if (children == null) {
+                throw new IllegalStateException("Could not list Artifact directory: ${directory}")
             }
-            String relative = rootPath.relativize(candidatePath).toString().replace('\\', '/')
-            if (TRACE_PATH.matcher(relative).matches()) {
-                traces << candidate
+            for (File candidate : children) {
+                Path candidatePath = candidate.canonicalFile.toPath()
+                if (!candidatePath.startsWith(rootPath)) {
+                    throw new IllegalStateException("Trace candidate escapes Artifact root: ${candidate}")
+                }
+                if (candidate.isDirectory()) {
+                    pending.add(candidate)
+                } else if (candidate.isFile()) {
+                    String relative = rootPath.relativize(candidatePath).toString().replace('\\', '/')
+                    if (TRACE_PATH.matcher(relative).matches()) {
+                        traces.add(candidate)
+                    }
+                }
             }
         }
         return traces.sort { it.path }
