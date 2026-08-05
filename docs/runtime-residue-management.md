@@ -113,11 +113,11 @@ RESIDUE_CLEANUP_EVIDENCE scope=<job/runId/dind> removed_images=<n> removed_trace
 - 结果：构建记录 20、完整 Artifact 5、失败 trace 2/7 天；25–30 GiB告警且拒绝并发执行，低于 25 GiB拒绝新的重型任务，低于 20 GiB进入紧急状态。
 - 验证：模拟水位、过期 Artifact、失败/中断 cleanup 和 Agent 重连后，均不误删当前或其他项目资源。
 
-D4.1 使用 Jenkins Controller 自身的 `DiskSpaceMonitor`遥测判断 Jenkins Home 所在文件系统可用字节，不向 Agent 暴露宿主目录或 Docker Socket。Regression、Release 和 Deploy 在首个工作负载 Stage 前执行门禁；专用 DIND Maintenance 不进入该门禁，确保低磁盘时仍可通过原有队列、executor、目标容器和明文确认门禁执行精确恢复。
+D4.1 由受信任 Shared Library读取 Jenkins Controller容器内 `/var/jenkins_home`所在文件系统的可用字节，audit凭据只读取executor状态；不向 Agent暴露宿主目录或 Docker Socket，也不新增任何Computer权限。Regression、Release 和 Deploy 在首个工作负载 Stage 前执行门禁；专用 DIND Maintenance 不进入该门禁，确保低磁盘时仍可通过原有队列、executor、目标容器和明文确认门禁执行精确恢复。
 
 失败 trace 由受信任 Shared Library 在 Artifact 归档后按固定 Job、Build number 和完整规范化路径收敛，只允许删除 `artifacts/test-runs/<runId>/playwright*-report/data/*.zip`。成功构建、超过 7 天的失败构建和最近两份之外的失败构建不保留 trace；结构化 JSON、日志、截图和 Keep Forever/pin 构建不进入删除集合。
 
-D4.1 本地证据包括静态配置验证、16 个 Shared Library测试、五组30/25/20 GiB边界容器测试，以及独立 Jenkins Home中的 JCasC/Job DSL运行时加载。运行时确认11个受管 Job采用20/5策略、5个重型 Job含资源门禁、4个DIND Maintenance Job保持豁免，并读取到真实 `DiskSpaceMonitor` API结构；隔离 fixture 连续完成22次无executor构建，最终保留pin构建1和最近20个普通构建，普通构建2已收敛。首次隔离测试发现`docker compose down --volumes`会枚举Compose文件中的共享显式命名卷；现有卷均因正在使用而拒绝删除，未发生数据损失。测试已改为仅删除随机命名的Controller、Jenkins Home卷和control网络，复测零残留。后续两次测试定义失败分别来自首次磁盘遥测尚未采样和pin请求重定向认证，两者均保持失败并完成隔离清理；有界等待与不跟随重定向修正后最终验收通过。
+D4.1 本地证据包括静态配置验证、16 个 Shared Library测试、五组30/25/20 GiB边界容器测试，以及独立 Jenkins Home中的 JCasC/Job DSL运行时加载。运行时确认11个受管 Job采用20/5策略、5个重型 Job含资源门禁、4个DIND Maintenance Job保持豁免；隔离 fixture 连续完成22次无executor构建，最终保留pin构建1和最近20个普通构建，普通构建2已收敛。首次隔离测试发现`docker compose down --volumes`会枚举Compose文件中的共享显式命名卷；现有卷均因正在使用而拒绝删除，未发生数据损失。测试已改为仅删除随机命名的Controller、Jenkins Home卷和control网络，复测零残留。后续测试定义失败分别来自首次磁盘遥测尚未采样、pin请求重定向认证和可选JSON字段的StrictMode访问，均保持失败并完成隔离清理。paper-server进一步确认锁定Jenkins版本的monitorData要求`Computer/Connect`，最终方案改为受信任Library读取Jenkins Home空间并保持RBAC不变。
 
 ## 2026-08-05 paper-server 基线记录
 

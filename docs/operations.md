@@ -14,7 +14,7 @@ docker compose ps
 
 运行资源、DIND 镜像、依赖缓存、Artifact、trace 和持久数据的分类、保留上限、磁盘水位、清理顺序与证据格式统一遵循[`runtime-residue-management.md`](runtime-residue-management.md)。日常检查不能只验证容器和 Workspace；还必须检查专用 DIND 的历史 run 镜像、BuildKit cache 与 Jenkins 大型 Artifact。30 GiB以下进入预警并要求串行，25 GiB以下自动拒绝新的 Regression、Release 和 Deploy，20 GiB以下进入紧急状态。
 
-重型 Pipeline 通过只读 Jenkins API读取 Controller `DiskSpaceMonitor`，输出 `RESOURCE_GATE_EVIDENCE`后才进入业务 Stage。门禁缺少遥测时失败关闭；不得通过参数伪造可用空间。`Platform/Maintenance/dind-*`不调用该资源门禁，以保留低磁盘恢复路径，但仍必须满足其原有空闲和精确目标门禁。
+重型 Pipeline 的受信任 Shared Library读取 Controller容器内 `/var/jenkins_home`所在文件系统的可用字节，audit凭据只通过Jenkins API读取executor状态；两者形成 `RESOURCE_GATE_EVIDENCE`后才进入业务 Stage。Jenkins Home路径缺失或空间值无效时失败关闭，不得通过参数伪造可用空间。`Platform/Maintenance/dind-*`不调用该资源门禁，以保留低磁盘恢复路径，但仍必须满足其原有空闲和精确目标门禁。
 
 业务和维护 Job 的普通构建记录上限为 20，完整 Artifact 上限为 5；Keep Forever构建豁免。Regression 在归档后输出 `TRACE_RETENTION_EVIDENCE`，非 pin 的 Playwright trace 只保留最近两个失败构建且最长 7 天，其他 JSON、日志和截图继续遵守 Artifact保留策略。
 

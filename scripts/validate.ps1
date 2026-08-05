@@ -79,6 +79,9 @@ try {
     Assert-True ($jenkinsConfig -match 'slaveAgentPort:\s*-1') 'Inbound agent TCP port is disabled.'
     Assert-True ($jenkinsConfig -match 'key:\s*"PAPER_SERVER_RESOURCE_MODE"' -and $jenkinsConfig -match 'value:\s*"\$\{PAPER_SERVER_RESOURCE_MODE\}"') 'paper-server resource mode is propagated to Pipeline environments through JCasC.'
 
+    $authorizationConfig = Get-Content -Raw -LiteralPath 'jcasc\authorization.yaml'
+    Assert-True ($authorizationConfig -notmatch 'Computer/(?:ExtendedRead|Configure|Connect|Create|Delete|Disconnect)') 'Resource gate introduces no Computer permission for audit or authenticated users.'
+
     $libraryConfig = Get-Content -Raw -LiteralPath 'jcasc\jobs.yaml'
     Assert-True ($libraryConfig -match 'https://github.com/Swimming1997/YL_Jenkins.git|\$\{JENKINS_LIBRARY_URL\}') 'SCM Shared Library URL is configured.'
     Assert-True ($libraryConfig -match 'libraryPath:\s*"shared-library"') 'SCM Shared Library path is configured.'
@@ -105,11 +108,11 @@ try {
     $resourceGate = Get-Content -Raw -LiteralPath 'shared-library\resources\xhsmedium\paper-server-resource-gate.py'
     $resourceGateStep = Get-Content -Raw -LiteralPath 'shared-library\vars\paperServerResourceGate.groovy'
     Assert-True ($resourceGate -match 'WARNING_BYTES = 30 \* GIB' -and $resourceGate -match 'REJECT_BYTES = 25 \* GIB' -and $resourceGate -match 'EMERGENCY_BYTES = 20 \* GIB' -and $resourceGate -match 'RESOURCE_GATE_EVIDENCE') 'Resource gate enforces the confirmed 30/25/20 GiB boundaries and emits evidence.'
-    Assert-True ($resourceGateStep -match "credentialsId: 'jenkins-audit-api'" -and $resourceGateStep -match 'PAPER_SERVER_RESOURCE_MODE' -and $resourceGateStep -match 'reason=missing_disk_telemetry' -and $resourceGateStep -match 'attempt.*-lt 30' -and $resourceGateStep -notmatch '/var/run/docker\.sock|(?i)docker\s+(?:system|volume)\s+prune') 'Resource gate uses read-only Jenkins telemetry, bounds initial telemetry sampling, and has no host Docker access.'
+    Assert-True ($resourceGateStep -match "new File\('/var/jenkins_home'\)" -and $resourceGateStep -match 'jenkinsHome\.usableSpace' -and $resourceGateStep -match "credentialsId: 'jenkins-audit-api'" -and $resourceGateStep -match 'computer/api/json\?tree=computer' -and $resourceGateStep -notmatch 'computer/\(built-in\)|/var/run/docker\.sock|(?i)docker\s+(?:system|volume)\s+prune') 'Trusted resource gate reads Controller Jenkins Home space, uses audit only for executor state, and has no host Docker access.'
 
     $tracePolicy = Get-Content -Raw -LiteralPath 'shared-library\src\org\swimming1997\jenkins\TraceRetentionPolicy.groovy'
     $traceStep = Get-Content -Raw -LiteralPath 'shared-library\vars\retainRegressionTraces.groovy'
-    Assert-True ($tracePolicy -match 'MAX_FAILURE_TRACES = 2' -and $tracePolicy -match '7L \* 24L' -and $tracePolicy -match 'playwright\[\^/\]\*-report/data/\[\^/\]\+\\\\\.zip' -and $tracePolicy -match 'build\.keepLog' -and $tracePolicy -notmatch 'eachFileRecurse') 'Trace retention keeps at most two seven-day failure trace files, restricts exact paths, exempts pinned builds, and avoids non-CPS recursive traversal closures.'
+    Assert-True ($tracePolicy -match 'MAX_FAILURE_TRACES = 2' -and $tracePolicy -match '7L \* 24L' -and $tracePolicy -match 'playwright\[\^/\]\*-report/data/\[\^/\]\+\\\\\.zip' -and $tracePolicy -match 'build\.keepLog' -and $tracePolicy -notmatch 'eachFileRecurse|\.sort\s*\{|\.collect\s*\{|\.each\s*\{|\.findAll\s*\{|\.collectMany\s*\{') 'Trace retention keeps at most two seven-day failure trace files, restricts exact paths, exempts pinned builds, and avoids non-CPS collection closures.'
     Assert-True ($traceStep -match "expectedJob = 'XHSMedium/Regression/scheduled'" -and $traceStep -match 'TRACE_RETENTION_EVIDENCE') 'Trace retention is restricted to the Regression Job and emits evidence.'
 
     $retentionDsl = @(

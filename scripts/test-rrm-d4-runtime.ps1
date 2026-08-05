@@ -92,14 +92,6 @@ try {
     $crumb = Invoke-RestMethod -Uri "$baseUrl/crumbIssuer/api/json" -Headers $headers -SessionVariable jenkinsSession -TimeoutSec 20
     $postHeaders = @{ Authorization = "Basic $pair" }
     $postHeaders[$crumb.crumbRequestField] = $crumb.crumb
-    $diskMonitor = $null
-    foreach ($attempt in 1..30) {
-        $builtIn = Invoke-RestMethod -Uri "$baseUrl/computer/(built-in)/api/json?depth=1" -Headers $headers -TimeoutSec 20
-        $diskMonitor = $builtIn.monitorData.'hudson.node_monitors.DiskSpaceMonitor'
-        if ($null -ne $diskMonitor -and $null -ne $diskMonitor.size) { break }
-        Start-Sleep -Seconds 2
-    }
-    Assert-True ($null -ne $diskMonitor -and [int64]$diskMonitor.size -ge 0) 'Jenkins DiskSpaceMonitor did not expose usable-byte telemetry in the expected API shape.'
     $managedJobs = @(
         'job/XHSMedium/job/CI/job/read-only',
         'job/XHSMedium/job/CI/job/watch-dev',
@@ -183,7 +175,7 @@ try {
     $controller = (docker compose ps --quiet controller).Trim()
     $resourceMode = (docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' $controller | Select-String '^PAPER_SERVER_RESOURCE_MODE=').ToString()
     Assert-True ($resourceMode -eq 'PAPER_SERVER_RESOURCE_MODE=false') 'Isolated local Controller did not keep paper-server resource mode disabled.'
-    Write-Host "RRM_D4_RUNTIME_EVIDENCE jobs=$($managedJobs.Count) builds=20 artifacts=5 pinned_builds=1 ordinary_builds=20 gated_jobs=5 maintenance_exempt=4 status=OK"
+    Write-Host "RRM_D4_RUNTIME_EVIDENCE jobs=$($managedJobs.Count) builds=20 artifacts=5 pinned_builds=1 ordinary_builds=20 gated_jobs=5 maintenance_exempt=4 computer_permissions_added=0 status=OK"
 }
 finally {
     try {
