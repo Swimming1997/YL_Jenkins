@@ -165,6 +165,7 @@ EOF
 
     docker save --output "$image_archive" \
         'docker.m.daocloud.io/library/mysql:8.4' \
+        'docker.m.daocloud.io/library/node:20-bookworm-slim' \
         'mcr.microsoft.com/playwright:v1.59.1-noble' \
         "$cache_prefix-backend:latest" \
         "$cache_prefix-frontend:latest" \
@@ -184,7 +185,7 @@ for role in backend frontend runner; do
     printf 'PASS: %s is loaded for %s.\n' "$image" "$sha"
 done
 
-for image in 'docker.m.daocloud.io/library/mysql:8.4' 'mcr.microsoft.com/playwright:v1.59.1-noble'; do
+for image in 'docker.m.daocloud.io/library/mysql:8.4' 'docker.m.daocloud.io/library/node:20-bookworm-slim' 'mcr.microsoft.com/playwright:v1.59.1-noble'; do
     docker exec "$dind_id" docker image inspect "$image" >/dev/null
     printf 'PASS: runtime image is loaded: %s\n' "$image"
 done

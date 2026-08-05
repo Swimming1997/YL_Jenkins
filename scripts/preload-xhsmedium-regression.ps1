@@ -75,6 +75,7 @@ try {
 
             $transferImages = @(
                 'docker.m.daocloud.io/library/mysql:8.4',
+                'docker.m.daocloud.io/library/node:20-bookworm-slim',
                 'mcr.microsoft.com/playwright:v1.59.1-noble'
             ) + @($roles | ForEach-Object { "$cachePrefix-$($_.Name):latest" })
             Invoke-Native docker (@('save', '--output', $imageArchive) + $transferImages)
@@ -98,7 +99,7 @@ try {
         }
         Write-Host "PASS: $image is loaded for $Sha."
     }
-    foreach ($image in @('docker.m.daocloud.io/library/mysql:8.4', 'mcr.microsoft.com/playwright:v1.59.1-noble')) {
+    foreach ($image in @('docker.m.daocloud.io/library/mysql:8.4', 'docker.m.daocloud.io/library/node:20-bookworm-slim', 'mcr.microsoft.com/playwright:v1.59.1-noble')) {
         docker exec $dindId docker image inspect $image *> $null
         if ($LASTEXITCODE -ne 0) { throw "Required runtime image is missing from DIND: $image" }
         Write-Host "PASS: Runtime image is loaded: $image"

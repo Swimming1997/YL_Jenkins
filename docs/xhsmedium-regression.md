@@ -29,6 +29,8 @@ Jenkins 运行时要求缓存标签与待测 SHA 完全一致。包装层只接�
 
 每次回归还会归档 `offline-dependency-cache.log`，分别记录 runner 与 backend/frontend 实际使用的完整固定 SHA。验收脚本直接检查该 Artifact，不依赖顶层 Console 是否转发项目执行器捕获的镜像构建输出。
 
+预加载归档同时包含 MySQL、Playwright 以及 Frontend 最终 Stage 使用的锁定 Node 20 runtime 镜像；这样隔离 DIND 在 services 构建时无需为基础运行镜像访问 Registry 或 DNS。
+
 runner 镜像内的三个 `node_modules`会被 Compose 命名卷覆盖。每个 project 首次启动 runner 时，平台入口脚本先确认 backend、frontend、automation 三个路径都是独立 mountpoint，只初始化这些卷的属主，然后使用 `setpriv`降权到 Regression Agent 的动态 UID/GID 再执行 sealed plan 原命令。入口脚本不以 root 身份运行项目测试，也不修改 fixed-SHA worktree。
 
 XHSMedium 的初始化脚本会被 MySQL 官方 entrypoint `source`，其中的 `set -u`会继续影响官方脚本。平台从 fixed-SHA 仓库外附加一个极薄 wrapper，由它在独立 Bash 子进程执行原始初始化脚本；这样保留原始数据库名校验、schema 和 seed，同时避免 Shell option 泄漏。平台不修改 fixed-SHA Workspace、数据库结构或种子数据。
