@@ -123,6 +123,7 @@ done
 
 removed_images=0
 removed_logical_bytes=0
+cache_fallback=0
 if [[ $mode == APPLY ]]; then
     for image in "${candidate_images[@]}"; do
         image_size=$("$real_docker" image inspect --format '{{.Size}}' "$image")
@@ -136,6 +137,11 @@ if [[ $mode == APPLY ]]; then
     done
     if (( before_cache_bytes > cache_limit_bytes )); then
         "$real_docker" builder prune --all --force --max-used-space "${cache_limit_bytes}B" >/dev/null
+        read_cache_stats
+        if (( cache_bytes > cache_limit_bytes )); then
+            "$real_docker" builder prune --all --force >/dev/null
+            cache_fallback=1
+        fi
     fi
 fi
 
@@ -172,7 +178,7 @@ reclaimed_bytes=0
 if (( disk_available_bytes > before_disk_available_bytes )); then
     reclaimed_bytes=$((disk_available_bytes - before_disk_available_bytes))
 fi
-printf 'DIND_MAINTENANCE_EVIDENCE target=%s mode=%s running_containers=%s candidate_images=%s removed_images=%s removed_logical_bytes=%s cache_before_bytes=%s cache_after_bytes=%s cache_reclaimable_before_bytes=%s cache_reclaimable_after_bytes=%s cache_reclaimed_bytes=%s reclaimed_bytes=%s disk_available_bytes=%s protected_images=%s residue=0 status=OK\n' \
+printf 'DIND_MAINTENANCE_EVIDENCE target=%s mode=%s running_containers=%s candidate_images=%s removed_images=%s removed_logical_bytes=%s cache_before_bytes=%s cache_after_bytes=%s cache_reclaimable_before_bytes=%s cache_reclaimable_after_bytes=%s cache_reclaimed_bytes=%s cache_fallback=%s reclaimed_bytes=%s disk_available_bytes=%s protected_images=%s residue=0 status=OK\n' \
     "$target" "$mode" "$running_container_count" "${#candidate_images[@]}" "$removed_images" "$removed_logical_bytes" \
     "$before_cache_bytes" "$after_cache_bytes" "$before_reclaimable_bytes" "$after_reclaimable_bytes" \
-    "$cache_reclaimed_bytes" "$reclaimed_bytes" "$disk_available_bytes" "${#protected_images[@]}"
+    "$cache_reclaimed_bytes" "$cache_fallback" "$reclaimed_bytes" "$disk_available_bytes" "${#protected_images[@]}"

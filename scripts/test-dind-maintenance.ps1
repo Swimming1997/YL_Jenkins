@@ -26,7 +26,7 @@ function Set-FakeState {
     param([string[]]$Images, [string]$Cache = '6GB', [string]$Reclaimable = '4GB')
     Write-Utf8NoBom -Path $statePath -Content (($Images -join "`n") + "`n")
     Write-Utf8NoBom -Path (Join-Path $tempRoot 'cache') -Content "$Cache`t$Reclaimable`n"
-    foreach ($marker in @('removed', 'pruned', 'running', 'fail-list', 'stubborn-cache')) {
+    foreach ($marker in @('removed', 'pruned', 'prune-count', 'running', 'fail-list', 'stubborn-cache', 'needs-fallback')) {
         Remove-Item -LiteralPath (Join-Path $tempRoot $marker) -Force -ErrorAction SilentlyContinue
     }
 }
@@ -87,7 +87,15 @@ case "$command" in
   builder)
     [[ ${1:-} == prune ]] || exit 90
     touch /test/pruned
-    [[ -f /test/stubborn-cache ]] || printf '3GB\t500MB\n' >/test/cache
+    count=0
+    [[ ! -f /test/prune-count ]] || count=$(cat /test/prune-count)
+    count=$((count + 1))
+    printf '%s\n' "$count" >/test/prune-count
+    if [[ ! -f /test/stubborn-cache ]]; then
+      if [[ ! -f /test/needs-fallback ]] || [[ " $* " != *" --max-used-space "* ]]; then
+        printf '3GB\t500MB\n' >/test/cache
+      fi
+    fi
     ;;
   *) exit 91 ;;
 esac
@@ -139,7 +147,7 @@ esac
     Set-FakeState -Images $allImages
     $apply = Invoke-Maintenance -Target 'regression' -Mode 'APPLY' -CurrentSha $current -PreviousSha $previous -Confirmation 'APPLY_DEDICATED_DIND_MAINTENANCE'
     Assert-True ($apply.ExitCode -eq 0) 'Confirmed Regression APPLY succeeds.'
-    Assert-True ($apply.Output -match 'mode=APPLY running_containers=0 candidate_images=3 removed_images=3 removed_logical_bytes=300.*cache_before_bytes=6000000000.*cache_after_bytes=3000000000.*cache_reclaimed_bytes=3000000000.*reclaimed_bytes=[0-9]+.*residue=0 status=OK') 'APPLY emits bounded cleanup evidence.'
+    Assert-True ($apply.Output -match 'mode=APPLY running_containers=0 candidate_images=3 removed_images=3 removed_logical_bytes=300.*cache_before_bytes=6000000000.*cache_after_bytes=3000000000.*cache_reclaimed_bytes=3000000000.*cache_fallback=0.*reclaimed_bytes=[0-9]+.*residue=0 status=OK') 'APPLY emits bounded cleanup evidence.'
     $remaining = @(Get-Content -LiteralPath $statePath | Where-Object { $_ })
     Assert-True (-not ($remaining | Where-Object { $_ -in $oldImages })) 'Only expired SHA dependency caches are removed.'
     Assert-True (-not ($currentImages + $previousImages + $protected | Where-Object { $_ -notin $remaining })) 'Current SHA, previous SHA, and fixed inputs are preserved.'
@@ -152,11 +160,17 @@ esac
     Assert-True (-not (Test-Path (Join-Path $tempRoot 'removed'))) 'Non-Regression maintenance preserves every image.'
 
     Set-FakeState -Images $allImages
+    New-Item -ItemType File -Path (Join-Path $tempRoot 'needs-fallback') | Out-Null
+    $fallback = Invoke-Maintenance -Target 'release' -Mode 'APPLY' -Confirmation 'APPLY_DEDICATED_DIND_MAINTENANCE'
+    Assert-True ($fallback.ExitCode -eq 0 -and $fallback.Output -match 'cache_after_bytes=3000000000.*cache_fallback=1') 'APPLY records and succeeds through the dedicated-cache fallback when the bounded policy is not honored.'
+    Assert-True ((Get-Content -LiteralPath (Join-Path $tempRoot 'prune-count')).Trim() -eq '2') 'Fallback performs one bounded attempt followed by one dedicated unused-cache purge.'
+
+    Set-FakeState -Images $allImages
     New-Item -ItemType File -Path (Join-Path $tempRoot 'stubborn-cache') | Out-Null
     $overLimit = Invoke-Maintenance -Target 'regression' -Mode 'APPLY' -CurrentSha $current -PreviousSha $previous -Confirmation 'APPLY_DEDICATED_DIND_MAINTENANCE'
     Assert-True ($overLimit.ExitCode -eq 76) 'APPLY fails when dedicated BuildKit cache remains above the limit.'
 
-    Write-Host 'RRM_D31_FOCUSED_EVIDENCE: audit=READ_ONLY confirmation=ENFORCED busy=REJECTED malformed=REJECTED expired=REMOVED protected=PRESERVED cache=BOUNDED'
+    Write-Host 'RRM_D31_FOCUSED_EVIDENCE: audit=READ_ONLY confirmation=ENFORCED busy=REJECTED malformed=REJECTED expired=REMOVED protected=PRESERVED cache=BOUNDED fallback=VERIFIED'
 }
 finally {
     Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue

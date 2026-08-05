@@ -18,6 +18,8 @@ docker compose ps
 
 Maintenance 只能对固定 Agent 所连接的专用 TLS DIND执行。AUDIT 可以只读报告运行容器；APPLY 遇到目标运行容器或其他 Jenkins executor 活跃时必须拒绝。镜像命名越界、protected image 丢失或 APPLY 后 cache 仍超过 4 GiB时，Job 必须失败。不得从宿主执行等价的无范围 prune。
 
+APPLY 先请求 Docker 将全部未使用 BuildKit cache 保持在 4 GiB以内。若内置 Docker driver 接受上限参数但复测仍超限，Job 会在同一专用 DIND内清空全部未使用 BuildKit cache，并以 `cache_fallback=1`记录；两种路径都必须再次验证 protected images，且不得删除任何镜像来满足 cache 上限。
+
 ## 启停和重建
 
 ```powershell
