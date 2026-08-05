@@ -80,7 +80,7 @@ pipeline {
         always {
             sh 'rm -f .docker-dind-maintenance.sh queue.json executors.json regression-builds.json'
             script {
-                def maintenanceTmp = "${env.WORKSPACE}@tmp"
+                def maintenanceTmp = "${env.WORKSPACE}@tmp".toString()
                 def allowedMaintenanceTmp = [
                     "/home/jenkins/agent/workspace/Platform/Maintenance/dind-regression@tmp",
                     "/home/jenkins/agent/workspace/Platform/Maintenance/dind-release@tmp",
