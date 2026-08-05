@@ -33,6 +33,8 @@ runner 镜像内的三个 `node_modules`会被 Compose 命名卷覆盖。每个 
 
 XHSMedium 的初始化脚本会被 MySQL 官方 entrypoint `source`，其中的 `set -u`会继续影响官方脚本。平台从 fixed-SHA 仓库外附加一个极薄 wrapper，由它在独立 Bash 子进程执行原始初始化脚本；这样保留原始数据库名校验、schema 和 seed，同时避免 Shell option 泄漏。平台不修改 fixed-SHA Workspace、数据库结构或种子数据。
 
+MySQL 8.4 锁定镜像的临时初始化服务器使用 `/var/lib/mysql/mysql.sock`。wrapper 只为原始脚本的子 Bash 设置 `MYSQL_UNIX_PORT`指向该 socket；不改写原始脚本，也不把变量或 Shell option 写回官方 entrypoint。
+
 依赖锁文件或待测 SHA 更新后必须先重新执行预加载。预加载只使用宿主机 Docker 客户端，不向 Agent 挂载 Docker Socket；临时源码快照和 tar 无论成功失败都会删除。
 
 paper-server 不安装 PowerShell，使用 `scripts/preload-xhsmedium-regression.sh`完成等价预加载。它通过 `.secrets/xhsmedium_scm_token`只读获取指定完整 SHA，不读取服务器已有的其他 XHSMedium 工作目录；三个依赖 Stage 和全部测试运行仍在 Docker 中。该环境设置 `PAPER_SERVER_RESOURCE_MODE=true`，所以两小时 Timer Trigger 不会在重型 profile 停止时排队，固定 SHA 验收由管理员在 Regression profile 活跃期间手工触发。
