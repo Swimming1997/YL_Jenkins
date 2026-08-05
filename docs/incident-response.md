@@ -25,7 +25,14 @@
 3. 检查 Workspace、npm cache 和 `.platform-compat`辅助文件。
 4. cleanup 未成功时保持失败状态，不执行跨项目删除。
 
+## 磁盘增长或运行残留
+
+1. 停止新的重型任务，记录 `df`、Docker、专用 DIND、Jenkins Home 和最大 Artifact 占用。
+2. 按[`runtime-residue-management.md`](runtime-residue-management.md)区分零残留对象、有界证据/缓存和禁止日常删除的持久数据。
+3. 依次处理精确 run 镜像、过期 trace、旧 SHA 缓存和专用 DIND BuildKit cache；每步重新测量可用空间。
+4. 保留当前 SHA、唯一成功基线、首个失败、结构化 JSON、日志和截图；禁止宿主全局 prune。
+5. 清理后确认重型 profile 已停止、Jenkins 队列为空、基线服务健康，并记录 `RESIDUE_CLEANUP_EVIDENCE`。
+
 ## 凭据或权限异常
 
 立即停止相关 Job，保留脱敏日志，运行 `test-authorization.ps1`。不得把 Token、密码、Cookie 或连接串复制到聊天、工单或 Artifact；疑似泄漏时由凭据所有者撤销并重新生成。
-

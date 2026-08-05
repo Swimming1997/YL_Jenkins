@@ -21,8 +21,8 @@
 - 归档直接业务证据，而不是只依赖绿色构建。
 - `post`中按唯一 runId 或精确项目名清理 Workspace、缓存和测试资源。
 - 配置明确的构建与 Artifact 保留数量。
+- 按[`runtime-residue-management.md`](runtime-residue-management.md)声明运行镜像、依赖缓存、BuildKit cache、trace 和持久数据的分类、上限、删除边界及残留证据。
 
 ## 接入验收
 
 运行平台静态与运行时验证、权限边界、Agent smoke、项目成功/失败路径和资源清理测试。只有直接证据全部通过且 cleanup 成功后，才能把项目标记为已接入。
-

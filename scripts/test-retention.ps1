@@ -38,6 +38,7 @@ Assert-True ((Invoke-WebRequest -UseBasicParsing -Uri "$regressionUrl/artifact/o
 $console = (Invoke-WebRequest -UseBasicParsing -Uri "$regressionUrl/consoleText" -Headers $headers -TimeoutSec 20).Content
 $identity = [regex]::Match($console, 'P4_SCHEDULED_REGRESSION_OK runId=(scheduled-[0-9]{8}-[0-9]{6}-[0-9a-f]{8})')
 Assert-True $identity.Success 'Retained regression build records its runId.'
+$project = "xhsmedium-test-$($identity.Groups[1].Value)"
 $summaryUrl = "$regressionUrl/artifact/artifacts/test-runs/$($identity.Groups[1].Value)/summary.json"
 Assert-True ((Invoke-WebRequest -UseBasicParsing -Uri $summaryUrl -Headers $headers -TimeoutSec 20).StatusCode -eq 200) 'Retained regression build includes Requirement summary evidence.'
 
@@ -52,12 +53,16 @@ try {
         docker compose exec --no-TTY regression-docker docker inspect --format '{{index .Config.Labels "com.docker.compose.project"}}' $_
     } | Where-Object { $_ -match '^xhsmedium-test-scheduled-' }
     Assert-True (-not $scheduledContainers) 'No scheduled regression container remains after completed builds.'
+    $runImageResidue = docker compose exec --no-TTY regression-docker docker image ls --format '{{.Repository}}:{{.Tag}}' | Where-Object {
+        $_ -in @("${project}-backend:latest", "${project}-frontend:latest", "${project}-runner:latest")
+    }
+    Assert-True (-not $runImageResidue) "Build $RegressionBuild has no residual run images."
     $workspaceResidue = docker compose exec --no-TTY regression-agent sh -lc 'find /home/jenkins/agent -mindepth 1 -maxdepth 8 -path "*/workspace/XHSMedium/Regression/scheduled/*" -print -quit'
     Assert-True (-not $workspaceResidue) 'Scheduled regression Workspace is clean.'
 
     $trackedPrune = git grep -n -E 'docker[[:space:]]+system[[:space:]]+prune|docker[[:space:]]+volume[[:space:]]+prune' -- . ':!docs/*'
     Assert-True (-not $trackedPrune) 'Platform automation contains no global Docker prune command.'
-    Write-Host "P45_RETENTION_EVIDENCE: regression_build=$RegressionBuild controller_use_pct=$controllerUse dind_use_pct=$dindUse residue=0"
+    Write-Host "P45_RETENTION_EVIDENCE: regression_build=$RegressionBuild controller_use_pct=$controllerUse dind_use_pct=$dindUse run_images=0 residue=0"
     $global:LASTEXITCODE = 0
 }
 finally {

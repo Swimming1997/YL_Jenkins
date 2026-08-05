@@ -43,6 +43,20 @@ function Assert-ExactProjectClean {
     Assert-True (-not $networks) "Project $project has no residual networks."
 }
 
+function Assert-ExactRunImagesClean {
+    param([string]$RunId, [string]$Console)
+    $project = "xhsmedium-test-$RunId"
+    $expected = @(
+        "${project}-backend:latest"
+        "${project}-frontend:latest"
+        "${project}-runner:latest"
+    )
+    $images = docker compose exec --no-TTY regression-docker docker image ls --format '{{.Repository}}:{{.Tag}}'
+    $residue = @($images | Where-Object { $_ -in $expected })
+    Assert-True (-not $residue) "Project $project has no residual run images."
+    Assert-True ($Console -match "RESIDUE_CLEANUP_EVIDENCE scope=$([regex]::Escape($project)).*residue=0 status=OK") "Project $project records zero-residue run image cleanup evidence."
+}
+
 Push-Location $repoRoot
 try {
 $failure = Get-BuildEvidence $FailureBuildNumber
@@ -53,12 +67,14 @@ Assert-True ($failureSummary.status -eq 'FAILED') 'Failure summary records FAILE
 Assert-True ([bool]$failureSummary.firstFailure.stageId -and [bool]$failureSummary.firstFailure.classification) 'Failure summary preserves the first useful failure.'
 Assert-True ($failureSummary.cleanup.attempted -and $failureSummary.cleanup.succeeded) 'Failure summary records successful automation cleanup.'
 Assert-ExactProjectClean $failure.RunId
+Assert-ExactRunImagesClean $failure.RunId $failure.Console
 
 $timeout = Get-BuildEvidence $TimeoutBuildNumber
 Assert-True ($timeout.Build.result -eq 'ABORTED') "Timeout build $TimeoutBuildNumber is ABORTED."
 Assert-True ($timeout.Console -match 'Timeout has been exceeded') 'Timeout build records the Jenkins timeout cause.'
 Assert-True ($timeout.Console -notmatch 'P4_SCHEDULED_REGRESSION_OK') 'Timeout build did not emit the success marker.'
 Assert-ExactProjectClean $timeout.RunId
+Assert-ExactRunImagesClean $timeout.RunId $timeout.Console
 
 $interruption = Get-BuildEvidence $InterruptionBuildNumber
 Assert-True ($interruption.Build.result -eq 'ABORTED') "Interruption build $InterruptionBuildNumber is ABORTED."
@@ -66,6 +82,7 @@ Assert-True ($interruption.Console -match 'Aborted by Local Platform Administrat
 Assert-True ($interruption.Console -match "P4_EXACT_PROJECT_CLEANUP_OK project=xhsmedium-test-$([regex]::Escape($interruption.RunId))") 'Interruption build records converged exact project cleanup.'
 Assert-True ($interruption.Console -notmatch 'P4_SCHEDULED_REGRESSION_OK') 'Interruption build did not emit the success marker.'
 Assert-ExactProjectClean $interruption.RunId
+Assert-ExactRunImagesClean $interruption.RunId $interruption.Console
 
     $workspaceResidue = docker compose exec --no-TTY regression-agent sh -lc 'find /home/jenkins/agent -mindepth 1 -maxdepth 8 -path "*/workspace/XHSMedium/Regression/scheduled/*" -print -quit'
     Assert-True (-not $workspaceResidue) 'Scheduled regression Workspace is clean after resilience builds.'
@@ -78,5 +95,5 @@ finally {
     Pop-Location
 }
 
-Write-Host "P4_RESILIENCE_EVIDENCE: failure=$FailureBuildNumber timeout=$TimeoutBuildNumber interruption=$InterruptionBuildNumber cleanup=true"
+Write-Host "P4_RESILIENCE_EVIDENCE: failure=$FailureBuildNumber timeout=$TimeoutBuildNumber interruption=$InterruptionBuildNumber run_images=0 cleanup=true"
 $global:LASTEXITCODE = 0

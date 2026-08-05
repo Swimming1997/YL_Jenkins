@@ -10,6 +10,10 @@ docker compose ps
 
 正常状态要求 Controller、Build Agent、Regression Agent 和隔离 DIND 均为 `healthy`，Jenkins 队列无异常积压，Jenkins Home 与 DIND 文件系统使用率低于 90%，已完成的 scheduled project、Workspace 和兼容辅助文件无残留。
 
+## 运行残留治理
+
+运行资源、DIND 镜像、依赖缓存、Artifact、trace 和持久数据的分类、保留上限、磁盘水位、清理顺序与证据格式统一遵循[`runtime-residue-management.md`](runtime-residue-management.md)。日常检查不能只验证容器和 Workspace；还必须检查专用 DIND 的历史 run 镜像、BuildKit cache 与 Jenkins 大型 Artifact。低于 25 GiB进入预警，低于 20 GiB时禁止启动新的重型任务。
+
 ## 启停和重建
 
 ```powershell
@@ -33,4 +37,3 @@ Controller executor 必须保持为 0。Agent SSH 端口和 DIND 端口不得映
 ## 变更验收
 
 平台代码修改先运行静态检查和相关聚焦测试，再执行 `test-hardening.ps1`。失败报告必须保留首个有效失败；中断、超时、cleanup 失败或覆盖缺口不得改写为通过。
-

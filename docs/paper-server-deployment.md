@@ -122,6 +122,8 @@ ss -lnt | grep -E ':(8080|5000)\b'
 - Jenkins 队列为空，Job Workspace 无业务文件残留。
 - 主机至少保留 4 GiB available 内存和 20 GiB 可用磁盘；低于水位时停止新的重型任务。
 
+磁盘治理采用分级水位：30 GiB及以上正常，25–30 GiB预警，20–25 GiB停止新重型任务并清理精确残留，低于 20 GiB进入紧急处置。运行镜像、DIND cache、Jenkins Artifact 和 trace 的保留矩阵及清理证据见[`runtime-residue-management.md`](runtime-residue-management.md)。禁止以宿主全局 prune 代替按 runId、SHA、Build 或专用 DIND 的精确清理。
+
 首次云端基线验收中，`Platform/Validation/build-agent-smoke` 构建 1 为 `SUCCESS`，控制台包含 `BUILD_AGENT_OK`，Workspace 无业务文件残留。
 
 ## Secret 与恢复
