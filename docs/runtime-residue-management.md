@@ -100,7 +100,7 @@ RESIDUE_CLEANUP_EVIDENCE scope=<job/runId/dind> removed_images=<n> removed_trace
 
 ### RRM-D3.1：专用 DIND 维护任务
 
-- 状态：实现和本地验证完成，待 paper-server Docker 验收。
+- 状态：完成。四个专用 DIND AUDIT 与 Regression APPLY 已在 paper-server 串行验收，所有重型 profile 均已停止。
 - 范围：只读审计 helper、四个管理员触发的 Maintenance Job、专用 Regression/Release/Deploy DIND。
 - 结果：报告各专用 DIND 的镜像和 BuildKit cache；Regression 只删除当前及上一已验证 SHA 之外的精确依赖缓存；将目标 DIND BuildKit cache 维护到不超过 4 GiB并输出结构化证据。
 - 门禁：Jenkins 队列为空、除当前 Maintenance 外无其他执行器、目标 DIND 无运行容器、APPLY 明文确认、Regression SHA 窗口通过成功构建记录验证。
@@ -118,3 +118,5 @@ RESIDUE_CLEANUP_EVIDENCE scope=<job/runId/dind> removed_images=<n> removed_trace
 本次人工治理将可用磁盘从约 20 GiB恢复到约 34 GiB：删除专用 Regression DIND 中 32 个历史运行/旧缓存镜像、清空其 BuildKit cache，并删除构建 5–12 的 18 个已结案 Playwright trace（约 1.12 GB）。最终 SHA `b48c1e8f98df9a085452d8746cba024d8e263fea`的三类依赖缓存、固定输入镜像、构建 13 的成功证据、失败日志、JSON 和截图均保留；Langfuse、New API、数据库和 Registry 未进入清理范围。
 
 RRM-D2 全量验收使用同一固定 SHA 完成构建 14–17：成功、1 分钟 timeout、管理员中断和 backend 故障注入均输出 `RESIDUE_CLEANUP_EVIDENCE`，对应 Compose project 的容器、卷、网络、运行镜像、Workspace 和临时文件均为 0。验收后 Regression profile 已停止；BuildKit cache 约 5.68 GB，作为 RRM-D3.1 的首个维护验收对象保留。
+
+RRM-D3.1 验收中，Regression AUDIT build 3、APPLY build 6、Release AUDIT build 1、Dev Deploy AUDIT build 1 和 Test Deploy AUDIT build 1 均为 SUCCESS。Regression APPLY 将 BuildKit cache 从 5.688 GB降至 0，保留 `b48c1e8f98df9a085452d8746cba024d8e263fea`三类依赖缓存和三个固定输入镜像，`cache_fallback=1`、`protected_images=6`、`residue=0`；宿主可用磁盘由约 28 GiB恢复到约 30 GiB。验收后 Jenkins 队列为空，所有重型 profile 已停止，Controller、Build Agent 和 Registry 保持 healthy。
