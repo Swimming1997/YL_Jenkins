@@ -108,7 +108,7 @@ RESIDUE_CLEANUP_EVIDENCE scope=<job/runId/dind> removed_images=<n> removed_trace
 
 ### RRM-D4：保留策略与水位门禁
 
-- 状态：D4.1 本地开发验证完成（2026-08-05）；尚未提交、推送或在 paper-server 应用。
+- 状态：完成。D4.1 本地开发验证与 D4.2 paper-server Docker 串行全量验收均已完成（2026-08-06）。
 - 范围：Job DSL build/artifact discarder、失败 trace/Artifact 保留、重型 Job 启动前检查、验证脚本和告警文档。
 - 结果：构建记录 20、完整 Artifact 5、失败 trace 2/7 天；25–30 GiB告警且拒绝并发执行，低于 25 GiB拒绝新的重型任务，低于 20 GiB进入紧急状态。
 - 验证：模拟水位、过期 Artifact、失败/中断 cleanup 和 Agent 重连后，均不误删当前或其他项目资源。
@@ -126,3 +126,11 @@ D4.1 本地证据包括静态配置验证、16 个 Shared Library测试、五组
 RRM-D2 全量验收使用同一固定 SHA 完成构建 14–17：成功、1 分钟 timeout、管理员中断和 backend 故障注入均输出 `RESIDUE_CLEANUP_EVIDENCE`，对应 Compose project 的容器、卷、网络、运行镜像、Workspace 和临时文件均为 0。验收后 Regression profile 已停止；BuildKit cache 约 5.68 GB，作为 RRM-D3.1 的首个维护验收对象保留。
 
 RRM-D3.1 验收中，Regression AUDIT build 3、APPLY build 6、Release AUDIT build 1、Dev Deploy AUDIT build 1 和 Test Deploy AUDIT build 1 均为 SUCCESS。Regression APPLY 将 BuildKit cache 从 5.688 GB降至 0，保留 `b48c1e8f98df9a085452d8746cba024d8e263fea`三类依赖缓存和三个固定输入镜像，`cache_fallback=1`、`protected_images=6`、`residue=0`；宿主可用磁盘由约 28 GiB恢复到约 30 GiB。验收后 Jenkins 队列为空，所有重型 profile 已停止，Controller、Build Agent 和 Registry 保持 healthy。
+
+## 2026-08-06 RRM-D4.2 paper-server 验收记录
+
+RRM-D4.2 使用平台提交 `83f59cfc40321fa24d0b45cb162acc94676ee776`完成 Docker 串行验收。Regression build 20 在不存在的受信任格式分支上先输出 `RESOURCE_GATE_EVIDENCE state=WARNING status=OK`，随后按预期失败；Controller Jenkins Home 可用空间为 `31776329728`字节，其他活动 executor 为 0。其 `TRACE_RETENTION_EVIDENCE`删除 3 个 trace、保留 2 个，实际保留窗口为20个 Build、3个含 Artifact 的 Build和2个 trace，7天外 trace 为0；控制台未出现 `eachFileRecurse`、`ArrayList.sort`、`GroovyCastException`或其他 CPS mismatch。
+
+Release candidate build 1、Release approve build 1、dev Deploy build 1和test Deploy build 1均在资源门禁成功后因无效参数按预期失败，没有构建、推送、审批、部署或回滚副作用。四个重型 profile 严格串行启停；dev/test Agent在容器 healthy 后通过 Jenkins既有节点重连入口恢复在线，未修改节点、网络或权限配置。
+
+最终检查确认11个受管 Job均配置 Build 20 / Artifact 5，audit只读取队列和executor API且两者均为0；`config.xml`仍对audit返回403，JCasC未增加任何`Computer/*`权限。8个重型Agent/DIND容器全部停止，Controller、Build Agent和Registry共3个基线服务均为healthy，临时容器、卷和网络均为0。宿主最终可用磁盘为`31785701376`字节、available内存为`10574741504`字节；Jenkins Home、Registry、Langfuse、New API、数据库及其他项目数据均未进入清理范围。
