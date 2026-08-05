@@ -96,7 +96,7 @@ paper-server 的手工验收槽使用同一固定 SHA，并要求偶数 UTC 小�
 
 验收完成后停止 Regression profile。paper-server 的手工槽不替代其他环境已经完成的真实 TimerTrigger 验收。
 
-如果 paper-server 到业务锁文件记录的包地址持续超时，可以从受控构建主机传入使用相同完整 SHA 和锁定基础镜像生成的 BuildKit local cache，放在被忽略的 `.secrets/p4-preload-build-cache-<short-sha>/<role>`。预加载器只通过 `type=local`读取这些精确层，不访问 Registry cache；它仍会重新解析 Dockerfile、固定 SHA 上下文和标签，并在导入 DIND 后验证完整 SHA 与角色。禁止修改业务锁文件、替换包地址或把失败构建报告为通过。
+如果 paper-server 到业务锁文件记录的包地址持续超时，可以从受控构建主机传入使用相同完整 SHA 和锁定基础镜像生成的三个 `xhsmedium-deps-<short-sha>-<role>`镜像。管理员使用 `--import-existing`时，预加载器先在宿主 Docker 中验证每个镜像的完整 SHA 与角色标签，然后才通过临时 tar 导入 DIND，并在 DIND 内再次验证；该模式不访问 SCM、npm 或 Registry。禁止修改业务锁文件、替换包地址或把失败构建报告为通过。
 
 启动下一个 profile 前，必须确认上一个 Agent/DIND 已停止且 Jenkins 队列为空。禁止使用无范围的 `docker system prune`，也不得对共享主机执行 `docker compose down --volumes`。
 
