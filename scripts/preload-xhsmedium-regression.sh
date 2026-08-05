@@ -128,18 +128,24 @@ EOF
 
     docker tag 'docker.m.daocloud.io/library/node:20-bookworm-slim' "$node_alias"
     docker tag 'mcr.microsoft.com/playwright:v1.60.0-noble' "$runner_alias"
+    backend_cache_args=()
+    frontend_cache_args=()
+    runner_cache_args=()
+    [ ! -d "$repo_root/.secrets/p4-preload-build-cache-$short_sha/backend" ] || backend_cache_args=(--cache-from "type=local,src=$repo_root/.secrets/p4-preload-build-cache-$short_sha/backend")
+    [ ! -d "$repo_root/.secrets/p4-preload-build-cache-$short_sha/frontend" ] || frontend_cache_args=(--cache-from "type=local,src=$repo_root/.secrets/p4-preload-build-cache-$short_sha/frontend")
+    [ ! -d "$repo_root/.secrets/p4-preload-build-cache-$short_sha/runner" ] || runner_cache_args=(--cache-from "type=local,src=$repo_root/.secrets/p4-preload-build-cache-$short_sha/runner")
     docker build --network host --target dependencies \
-        --cache-from "$cache_prefix-backend:latest" \
+        "${backend_cache_args[@]}" \
         --build-arg "BACKEND_DEPENDENCY_CACHE_IMAGE=$node_alias" \
         --label "xhsmedium.preload.sha=$sha" --label 'xhsmedium.preload.role=backend' \
         --tag "$cache_prefix-backend:latest" --file "$snapshot/deploy/docker/backend.Dockerfile" "$snapshot"
     docker build --network host --target dependencies \
-        --cache-from "$cache_prefix-frontend:latest" \
+        "${frontend_cache_args[@]}" \
         --build-arg "FRONTEND_DEPENDENCY_CACHE_IMAGE=$node_alias" \
         --label "xhsmedium.preload.sha=$sha" --label 'xhsmedium.preload.role=frontend' \
         --tag "$cache_prefix-frontend:latest" --file "$snapshot/deploy/docker/frontend.Dockerfile" "$snapshot"
     docker build --network host --target dependencies \
-        --cache-from "$cache_prefix-runner:latest" \
+        "${runner_cache_args[@]}" \
         --build-arg "RUNNER_DEPENDENCY_CACHE_IMAGE=$runner_alias" \
         --label "xhsmedium.preload.sha=$sha" --label 'xhsmedium.preload.role=runner' \
         --tag "$cache_prefix-runner:latest" --file "$snapshot/automation/docker/runner.Dockerfile" "$snapshot"
