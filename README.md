@@ -141,6 +141,7 @@ ssh -L 8080:127.0.0.1:8080 paper-server
 - `docs/onboarding-project.md`：新项目接入门禁和验收要求
 - `docs/xhsmedium-release.md`：候选镜像、digest manifest 和 Release 准入
 - `docs/registry-cloud-deployment.md`：云服务器自建 Registry 的 TLS、备份和 Jenkins 切换
+- `docs/production-readiness.md`：P7生产目标、身份、双人审批、Registry、Secret、备份和审计门禁矩阵
 - `docs/paper-server-deployment.md`：paper-server 资源受限测试部署、profile 和运维边界
 - `docs/xhsmedium-deployment.md`：P6 dev/test digest 部署、幂等、健康检查和回滚
 - `docs/agents.md`：Agent 标签、连接和验证
