@@ -255,6 +255,7 @@ target_running_count() {
     printf '%s' "$count"
 }
 
+ensure_temp_root
 case "$action" in
     start)
         others=$(other_running_services)

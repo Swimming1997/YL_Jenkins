@@ -16,6 +16,7 @@ $casePrefix = "jenkins-platform-profile-test-$([guid]::NewGuid().ToString('N').S
 $tempRoot = Join-Path ([IO.Path]::GetTempPath()) $casePrefix
 $mockRoot = Join-Path $tempRoot 'mock-bin'
 $stateRoot = Join-Path $tempRoot 'state'
+$runtimeTemp = Join-Path $stateRoot 'runtime-tmp'
 $secretRoot = Join-Path $tempRoot 'secrets'
 $utf8 = [Text.UTF8Encoding]::new($false)
 
@@ -152,7 +153,8 @@ printf 'flock %s\n' "$*" >>"$state/flock.log"
 [IO.File]::WriteAllText((Join-Path $mockRoot 'flock'), $flockMock, $utf8)
 
 function Reset-State {
-    Get-ChildItem -LiteralPath $stateRoot -Force | Remove-Item -Force
+    Get-ChildItem -LiteralPath $stateRoot -Force | Remove-Item -Recurse -Force
+    New-Item -ItemType Directory -Path $runtimeTemp -Force | Out-Null
 }
 
 function Set-ServiceRunning {
@@ -179,6 +181,7 @@ function Invoke-ProfileCase {
         '--volume', "${mockRoot}:/mock-source:ro",
         '--volume', "${stateRoot}:/state",
         '--env', 'MOCK_STATE=/state',
+        '--env', 'TMPDIR=/state/runtime-tmp',
         '--env', 'PAPER_SERVER_PROFILE_POLL_ATTEMPTS=2',
         '--env', 'PAPER_SERVER_PROFILE_POLL_SECONDS=0',
         '--entrypoint', 'bash', $image,
@@ -192,6 +195,8 @@ function Invoke-ProfileCase {
     }
     $residue = docker ps -a --filter "name=^/${containerName}$" --format '{{.Names}}'
     if ($LASTEXITCODE -ne 0 -or $residue) { throw "Profile case '$Name' left a test container." }
+    $credentialResidue = Get-ChildItem -LiteralPath $runtimeTemp -Directory -Filter 'jenkins-profile-lifecycle.*'
+    if ($credentialResidue) { throw "Profile case '$Name' left credential temporary directories." }
     return ($output -join "`n")
 }
 
