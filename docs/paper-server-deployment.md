@@ -81,7 +81,9 @@ bash scripts/paper-server-profile.sh stop deploy-test
 
 P6.1-D1跨版本回滚验收需要两份成功且不同的Release Approval A/B；两者的Git SHA、backend digest和frontend digest都必须不同。paper-server不得同时启动dev与test Deploy profile：先用生命周期脚本启动dev，依次完成“A成功部署、B故障注入并恢复A、B正常部署”，保存三个Build与`rollback-evidence.json`后停止dev；确认队列和executor为空，再以相同步骤验收test。B故障构建必须保持`FAILURE`且不能输出`P6_DEPLOY_OK`，回滚证据必须明确记录`failedApprovalBuild=B`、`restoredApprovalBuild=A`和两个A digest，最终运行态必须是两个B digest。
 
-PowerShell验收脚本用于本地完整Docker拓扑；paper-server不在宿主安装PowerShell，服务器验收通过Jenkins参数化Build、API/Artifact和目标TLS DIND中的容器标签执行同一契约。所有服务部署仍在Docker内，Deploy阶段不得Checkout或编译源码，不得连接生产或真实外部系统。
+P6.1-D1已于2026-08-06在paper-server完成。使用Approval A 3和Approval B 4，dev构建5/6/7与test构建2/3/4分别通过“A成功、B故障恢复A、B成功”契约；两个故障Artifact均记录`failedApprovalBuild=4`、`restoredApprovalBuild=3`、A SHA和A双digest，最终运行B双digest。对应rollback evidence修复提交为`e9a688147b9ed959fe9c24dc5ffe03aed611af82`。验收结束时队列与active executor为零、Deploy Workspace无文件、四个重型profile全部停止，Controller保持healthy。
+
+paper-server宿主不安装PowerShell。需要复用PowerShell验收脚本时，可在受控操作端通过临时SSH隧道访问localhost Jenkins，并让Docker CLI通过SSH操作paper-server现有Compose项目；脚本所需的隔离测试Secret只能放入权限受限的唯一临时目录，禁止输出内容或复制SCM/TLS私钥，验收结束后必须删除Secret、目录和隧道并验证零残留。也可直接通过Jenkins参数化Build、API/Artifact和目标TLS DIND中的容器标签执行同一契约。所有服务部署仍在Docker内，Deploy阶段不得Checkout或编译源码，不得连接生产或真实外部系统。
 
 首次执行某个固定 SHA 前，先启动 Regression profile，再由 Linux 预加载器以只读 SCM Secret 获取该精确提交。预加载器仅在临时、被 Git 忽略的目录保存源码快照；依赖镜像在宿主机 Docker 中构建并导入隔离 DIND，宿主机不安装 Node.js、PowerShell 或项目运行时。缺失的固定输入镜像只在显式传入 `--pull-inputs`时拉取，拉取后仍必须匹配锁定 image ID。
 

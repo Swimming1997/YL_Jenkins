@@ -39,7 +39,7 @@ Deploy Job 不检出 Git、不编译源码、不执行 Docker build、Push 或�
 3. 核对恢复后的容器标签和 HTTP 健康状态。
 4. 归档 `rollback-evidence.json`并输出 `P6_DEPLOY_ROLLED_BACK`。
 
-首次验收只有一份合法 approved release，因此故障注入恢复的是同一 digest 的上一成功运行状态，验证的是状态捕获、失败门禁和恢复机制。P6.1-D1增加双Approval验收工具；只有基线A与候选B的Git SHA、backend digest和frontend digest均不同，并在dev/test完成“A成功、B失败恢复A、B再次成功”后，才关闭跨版本回滚缺口。
+首次验收只有一份合法 approved release，因此故障注入恢复的是同一 digest 的上一成功运行状态，验证的是状态捕获、失败门禁和恢复机制。P6.1-D1增加双Approval验收工具；该工具已在 paper-server 使用两份 SHA、backend digest和frontend digest均不同的合法 Approval 完成 dev/test 真实跨版本验收，跨版本回滚缺口已关闭。
 
 ## 本地验收证据
 
@@ -85,6 +85,19 @@ frontend registry:5000/xhsmedium/frontend@sha256:42b094476292029db5293a04b2ddf81
 也可以通过`-Environment dev`或`-Environment test`单独运行一个环境，以满足资源受限环境的严格串行要求。复核历史证据时，某个环境的`Existing*BaselineBuild`、`Existing*RollbackBuild`和`Existing*CandidateBuild`必须三个同时提供且构建号严格递增；脚本仍核对最终环境运行候选B，不接受不完整或顺序不成立的历史构建组合。
 
 P6.1-D1工具的本地静态与参数契约验证不等于真实跨digest通过。最终状态必须以两份合法Approval、两个环境的Jenkins构建、归档JSON、运行容器digest、Secret脱敏、队列和Workspace零残留证据为准。
+
+### P6.1-D1 完成证据（2026-08-06）
+
+- Jenkins Platform 修复提交：`e9a688147b9ed959fe9c24dc5ffe03aed611af82`。Deploy Pipeline 在加载`previous-deployment.env`前独立保存当前失败 Approval，JSON 和`P6_DEPLOY_ROLLED_BACK` marker不再被上一部署环境覆盖。
+- Approval A：构建 3，Git SHA `b48c1e8f98df9a085452d8746cba024d8e263fea`；backend digest `sha256:a1b8df408088cc3410f9f929adfcec6dff63ccd4c16121835c3be09621ee59fa`，frontend digest `sha256:ccb095b2e60953e3f2b6e961c8730719a471e87239145bdc0513f0b3b196063b`。
+- Approval B：构建 4，Git SHA `7021db362cdebf141c74a1034c04844fb349a83c`；backend digest `sha256:bf70768fdfae9eaf2aa59699a21188daaed14f800b882e555daec29205f743bd`，frontend digest `sha256:94de66ca3750a15fed2761ec0b4ca11aabdb663cab7cca36594b4ffd52a979c0`。
+
+| 环境 | 基线 A | B 故障并回滚 A | 最终 B | 结果 |
+|---|---:|---:|---:|---|
+| dev | 5 `SUCCESS` | 6 `FAILURE` | 7 `SUCCESS` | 回滚证据为失败 4、恢复 3，最终运行 B 双 digest |
+| test | 2 `SUCCESS` | 3 `FAILURE` | 4 `SUCCESS` | 回滚证据为失败 4、恢复 3，最终运行 B 双 digest |
+
+两个故障构建均没有`P6_DEPLOY_OK`，`rollback-evidence.json`均记录`healthy=true`、A SHA和两个A digest。两个最终构建均记录B SHA和两个B digest；控制台不含测试 Secret，Deploy Workspace无残留，Jenkins队列和active executor均为零。dev停止后才启动test，验收结束后四个重型profile全部停止。
 
 ## 云服务器迁移
 

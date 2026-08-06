@@ -1,6 +1,6 @@
 # Jenkins Platform
 
-本仓库提供可重建的 Jenkins 平台。当前实现范围为 G0～P6：在 Docker 主机中运行 Jenkins Controller、按用途隔离的 Agent 和专用 Docker-in-Docker，并通过 JCasC、Role Strategy 和 Job DSL 自动恢复平台配置；XHSMedium 已完成只读 CI、定时离线回归、不可变 Release 和隔离 dev/test 部署验收。P5～P6 当前仍属于本地或受控测试环境能力，不构成生产发布授权。
+本仓库提供可重建的 Jenkins 平台。当前实现范围为 G0～P6：在 Docker 主机中运行 Jenkins Controller、按用途隔离的 Agent 和专用 Docker-in-Docker，并通过 JCasC、Role Strategy 和 Job DSL 自动恢复平台配置；XHSMedium 已完成只读 CI、定时离线回归、不可变 Release，以及隔离 dev/test 的幂等部署和真实跨 digest 回滚验收。P5～P6 当前仍属于本地或受控测试环境能力，不构成生产发布授权。
 
 ## 当前基线
 
@@ -60,6 +60,7 @@ Get-Content .\.secrets\jenkins_admin_password
 .\scripts\test-hardening.ps1 -Cycles 3
 .\scripts\test-xhsmedium-release.ps1
 .\scripts\test-xhsmedium-deploy.ps1
+.\scripts\test-xhsmedium-deploy-cross-version.ps1 -BaselineApprovedReleaseBuild <approval-a> -CandidateApprovedReleaseBuild <approval-b>
 ```
 
 验证数据卷在容器重建后仍然保留数据：
@@ -116,7 +117,7 @@ Jenkins 与 Registry 均只监听服务器 localhost。通过 SSH 隧道访问 J
 ssh -L 8080:127.0.0.1:8080 paper-server
 ```
 
-详细的资源边界、profile 命令、Secret 规则和验收方法见 `docs/paper-server-deployment.md`。
+详细的资源边界、profile 命令、Secret 规则和验收方法见 `docs/paper-server-deployment.md`。P6.1-D1已使用两份不同SHA和双镜像digest的合法Approval，在paper-server严格串行完成dev/test的“A成功、B故障恢复A、B成功”闭环；本能力仍仅限受控非生产环境。
 
 ## 安全边界
 
