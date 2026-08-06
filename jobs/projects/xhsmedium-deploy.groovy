@@ -132,6 +132,7 @@ pipeline {
                             if (fileExists('previous-deployment.env')) {
                                 sh(
                                     'set +x; set -eu\\n' +
+                                    'failed_approval_build="$APPROVAL_BUILD"\\n' +
                                     '. ./previous-deployment.env\\n' +
                                     'printf "MYSQL_IMAGE=%s\\nBACKEND_IMAGE=%s\\nFRONTEND_IMAGE=%s\\nDEPLOY_ENVIRONMENT=%s\\nGIT_SHA=%s\\nAPPROVAL_BUILD=%s\\nMYSQL_PASSWORD=%s\\nJWT_SECRET=%s\\nDRAFT_KEY=%s\\n" "$MYSQL_IMAGE" "$BACKEND_IMAGE" "$FRONTEND_IMAGE" "$EXPECTED_ENVIRONMENT" "$GIT_SHA" "$APPROVAL_BUILD" "$MYSQL_PASSWORD" "$JWT_SECRET" "$DRAFT_KEY" > rollback.env\\n' +
                                     'docker compose --env-file rollback.env -f deploy-compose.yaml -p "$DEPLOY_PROJECT" up -d --force-recreate --wait --wait-timeout 180\\n' +
@@ -141,8 +142,8 @@ pipeline {
                                     'test "$(docker inspect --format \\\'{{index .Config.Labels "xhsmedium.deploy.image-reference"}}\\\' "$frontend_id")" = "$FRONTEND_IMAGE"\\n' +
                                     'docker exec "$backend_id" node -e "fetch(\\\'http://127.0.0.1:8089/api\\\').then(r=>{if(r.status>=500)process.exit(1)}).catch(()=>process.exit(1))"\\n' +
                                     'docker exec "$frontend_id" node -e "fetch(\\\'http://127.0.0.1:3302/\\\').then(r=>{if(r.status>=500)process.exit(1)}).catch(()=>process.exit(1))"\\n' +
-                                    'python3 -c "import json,os; p={k:v for k,v in (line.rstrip().split(\\\'=\\\',1) for line in open(\\\'previous-deployment.env\\\'))}; json.dump({\\\'schemaVersion\\\':\\\'1.0\\\',\\\'environment\\\':os.environ[\\\'EXPECTED_ENVIRONMENT\\\'],\\\'failedApprovalBuild\\\':int(os.environ[\\\'APPROVAL_BUILD\\\']),\\\'restoredApprovalBuild\\\':int(p[\\\'APPROVAL_BUILD\\\']),\\\'gitSha\\\':p[\\\'GIT_SHA\\\'],\\\'images\\\':{\\\'backend\\\':p[\\\'BACKEND_IMAGE\\\'],\\\'frontend\\\':p[\\\'FRONTEND_IMAGE\\\']},\\\'healthy\\\':True},open(\\\'rollback-evidence.json\\\',\\\'w\\\'),indent=2)"\\n' +
-                                    'echo "P6_DEPLOY_ROLLED_BACK environment=$EXPECTED_ENVIRONMENT approval=$APPROVAL_BUILD"\\n'
+                                    'FAILED_APPROVAL_BUILD="$failed_approval_build" python3 -c "import json,os; p={k:v for k,v in (line.rstrip().split(\\\'=\\\',1) for line in open(\\\'previous-deployment.env\\\'))}; json.dump({\\\'schemaVersion\\\':\\\'1.0\\\',\\\'environment\\\':os.environ[\\\'EXPECTED_ENVIRONMENT\\\'],\\\'failedApprovalBuild\\\':int(os.environ[\\\'FAILED_APPROVAL_BUILD\\\']),\\\'restoredApprovalBuild\\\':int(p[\\\'APPROVAL_BUILD\\\']),\\\'gitSha\\\':p[\\\'GIT_SHA\\\'],\\\'images\\\':{\\\'backend\\\':p[\\\'BACKEND_IMAGE\\\'],\\\'frontend\\\':p[\\\'FRONTEND_IMAGE\\\']},\\\'healthy\\\':True},open(\\\'rollback-evidence.json\\\',\\\'w\\\'),indent=2)"\\n' +
+                                    'echo "P6_DEPLOY_ROLLED_BACK environment=$EXPECTED_ENVIRONMENT approval=$failed_approval_build"\\n'
                                 )
                             } else {
                                 sh 'docker compose --env-file runtime.env -f deploy-compose.yaml -p "$DEPLOY_PROJECT" down --remove-orphans >/dev/null 2>&1 || true'
