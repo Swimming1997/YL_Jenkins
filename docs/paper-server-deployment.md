@@ -79,6 +79,10 @@ bash scripts/paper-server-profile.sh stop deploy-test
 
 平台镜像定义发生变化时，应在队列为空且所有重型profile停止后，单独评审并构建目标Agent镜像；日常profile启停不隐式重建镜像。
 
+P6.1-D1跨版本回滚验收需要两份成功且不同的Release Approval A/B；两者的Git SHA、backend digest和frontend digest都必须不同。paper-server不得同时启动dev与test Deploy profile：先用生命周期脚本启动dev，依次完成“A成功部署、B故障注入并恢复A、B正常部署”，保存三个Build与`rollback-evidence.json`后停止dev；确认队列和executor为空，再以相同步骤验收test。B故障构建必须保持`FAILURE`且不能输出`P6_DEPLOY_OK`，回滚证据必须明确记录`failedApprovalBuild=B`、`restoredApprovalBuild=A`和两个A digest，最终运行态必须是两个B digest。
+
+PowerShell验收脚本用于本地完整Docker拓扑；paper-server不在宿主安装PowerShell，服务器验收通过Jenkins参数化Build、API/Artifact和目标TLS DIND中的容器标签执行同一契约。所有服务部署仍在Docker内，Deploy阶段不得Checkout或编译源码，不得连接生产或真实外部系统。
+
 首次执行某个固定 SHA 前，先启动 Regression profile，再由 Linux 预加载器以只读 SCM Secret 获取该精确提交。预加载器仅在临时、被 Git 忽略的目录保存源码快照；依赖镜像在宿主机 Docker 中构建并导入隔离 DIND，宿主机不安装 Node.js、PowerShell 或项目运行时。缺失的固定输入镜像只在显式传入 `--pull-inputs`时拉取，拉取后仍必须匹配锁定 image ID。
 
 每个依赖镜像在导入前和导入 DIND 后都必须通过无网络容器探测。Backend 与 Frontend 探测会重新执行一次 `npm ci --offline`并检查顶层依赖，Runner 探测会检查三个工作区的顶层依赖；任何镜像即使 SHA/role 标签正确，只要离线依赖不完整也会失败关闭，禁止触发 Regression Job：

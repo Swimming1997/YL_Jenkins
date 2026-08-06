@@ -39,7 +39,7 @@ Deploy Job 不检出 Git、不编译源码、不执行 Docker build、Push 或�
 3. 核对恢复后的容器标签和 HTTP 健康状态。
 4. 归档 `rollback-evidence.json`并输出 `P6_DEPLOY_ROLLED_BACK`。
 
-首次验收只有一份合法 approved release，因此故障注入恢复的是同一 digest 的上一成功运行状态，验证的是状态捕获、失败门禁和恢复机制。第二份 approved release 产生后，应追加两个不同 digest 间的跨版本回滚验收。
+首次验收只有一份合法 approved release，因此故障注入恢复的是同一 digest 的上一成功运行状态，验证的是状态捕获、失败门禁和恢复机制。P6.1-D1增加双Approval验收工具；只有基线A与候选B的Git SHA、backend digest和frontend digest均不同，并在dev/test完成“A成功、B失败恢复A、B再次成功”后，才关闭跨版本回滚缺口。
 
 ## 本地验收证据
 
@@ -64,6 +64,27 @@ frontend registry:5000/xhsmedium/frontend@sha256:42b094476292029db5293a04b2ddf81
   -ExistingDevDeployBuild 1 -ExistingDevNoopBuild 2 -ExistingDevRollbackBuild 3 `
   -ExistingTestDeployBuild 1 -ExistingTestNoopBuild 2 -ExistingTestRollbackBuild 3
 ```
+
+## P6.1-D1 跨版本回滚验收
+
+`scripts/test-xhsmedium-deploy-cross-version.ps1`要求两份成功的Release Approval，并验证两个manifest的SHA及backend/frontend digest均不同。每个环境按固定顺序执行：
+
+1. 部署基线Approval A并核对两个A digest。
+2. 对候选Approval B注入健康失败，要求Jenkins构建保持`FAILURE`且没有`P6_DEPLOY_OK`。
+3. 核对`rollback-evidence.json`中的`failedApprovalBuild=B`、`restoredApprovalBuild=A`、A的Git SHA和两个A digest，并确认环境健康。
+4. 再次正常部署B，核对最终运行两个B digest且环境健康。
+
+本地完整拓扑可一次验收两个环境：
+
+```powershell
+.\scripts\test-xhsmedium-deploy-cross-version.ps1 `
+  -BaselineApprovedReleaseBuild <approval-a> `
+  -CandidateApprovedReleaseBuild <approval-b>
+```
+
+也可以通过`-Environment dev`或`-Environment test`单独运行一个环境，以满足资源受限环境的严格串行要求。复核历史证据时，某个环境的`Existing*BaselineBuild`、`Existing*RollbackBuild`和`Existing*CandidateBuild`必须三个同时提供且构建号严格递增；脚本仍核对最终环境运行候选B，不接受不完整或顺序不成立的历史构建组合。
+
+P6.1-D1工具的本地静态与参数契约验证不等于真实跨digest通过。最终状态必须以两份合法Approval、两个环境的Jenkins构建、归档JSON、运行容器digest、Secret脱敏、队列和Workspace零残留证据为准。
 
 ## 云服务器迁移
 
