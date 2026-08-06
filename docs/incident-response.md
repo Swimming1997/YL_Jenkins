@@ -13,10 +13,11 @@
 
 ## Agent 离线
 
-1. 确认队列中的 Job 标签和离线节点，不把排队记为测试失败。
-2. 检查 `build-agent`、`regression-agent`和 `regression-docker`健康状态。
-3. 仅重启对应 Agent；Regression Agent 必须继续只连接 TLS DIND。
-4. 运行 `test-agents.ps1`，要求 Jenkins 明确观察到离线与重新连接。
+1. 确认队列中的Job标签和离线节点，不把排队记为测试失败。
+2. paper-server先运行`bash scripts/paper-server-profile.sh status <profile>`，区分正常停止、目标半启动、容器不健康和Jenkins节点离线；Build Agent仍单独检查基线Compose服务。
+3. 重型节点使用`bash scripts/paper-server-profile.sh start <profile>`恢复。脚本只启动对应Agent/DIND，等待healthy，并在Docker DNS可用后请求既有Jenkins节点重连；不得为了恢复一个节点同时启动其他profile。
+4. 若全新启动无法恢复节点，确认脚本已经输出`PROFILE_LIFECYCLE_CLEANUP ... containers=0 residue=0 status=OK`；cleanup失败时保持基础设施失败并人工核对目标两个容器。已运行profile的重连失败不会由脚本自动停止，避免破坏可能存在的外部诊断现场。
+5. 恢复后保存`PROFILE_LIFECYCLE_EVIDENCE`。本地完整拓扑再运行`test-agents.ps1`，要求Jenkins明确观察到离线与重新连接；Regression Agent必须继续只连接TLS DIND。
 
 ## 回归失败或中断
 
@@ -32,8 +33,8 @@
 3. 先处理精确 run 镜像；再使用对应 `Platform/Maintenance/dind-*`执行 `AUDIT`，审核候选后以明确确认运行 `APPLY`，处理旧 SHA 缓存和专用 DIND BuildKit cache；每步重新测量可用空间。
 4. 过期 trace、Artifact 和 Jenkins Build 只能按 RRM-D4 的固定 Job、Build number和 Artifact相对路径策略处理，不得由 DIND Maintenance Job删除；Keep Forever/pin构建必须跳过。
 5. 查看最近的 `RESOURCE_GATE_EVIDENCE`和`TRACE_RETENTION_EVIDENCE`；遥测缺失、越界路径或删除失败均按基础设施失败处理，不得手工改成成功。
-5. 保留当前 SHA、唯一成功基线、首个失败、结构化 JSON、日志和截图；禁止宿主全局 prune。
-6. 清理后确认重型 profile 已停止、Jenkins 队列为空、基线服务健康，并记录 `RESIDUE_CLEANUP_EVIDENCE`。
+6. 保留当前 SHA、唯一成功基线、首个失败、结构化 JSON、日志和截图；禁止宿主全局 prune。
+7. 清理后确认重型 profile 已停止、Jenkins 队列为空、基线服务健康，并记录 `RESIDUE_CLEANUP_EVIDENCE`。
 
 ## 凭据或权限异常
 

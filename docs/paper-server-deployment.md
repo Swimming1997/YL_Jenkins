@@ -54,25 +54,30 @@ ssh -L 8080:127.0.0.1:8080 paper-server
 
 ## 串行 profile 操作
 
-所有命令都在 `/opt/jenkins-platform` 中执行，并同时指定基础与服务器覆盖文件。
+所有命令都在`/opt/jenkins-platform`中执行。生命周期脚本只接受四个明确profile，并以标准`flock`拒绝并发运维命令；启动时拒绝其他重型Agent/DIND或目标半启动状态，等待两个容器healthy，并在需要时通过既有管理员节点入口恢复Jenkins连接。
 
 ```bash
 # Regression
-docker compose -f compose.yaml -f compose.paper-server.yaml --profile regression up -d --build regression-docker regression-agent
-docker compose -f compose.yaml -f compose.paper-server.yaml stop regression-agent regression-docker
+bash scripts/paper-server-profile.sh start regression
+bash scripts/paper-server-profile.sh status regression
+bash scripts/paper-server-profile.sh stop regression
 
 # Release
-docker compose -f compose.yaml -f compose.paper-server.yaml --profile release up -d --build release-docker release-agent
-docker compose -f compose.yaml -f compose.paper-server.yaml stop release-agent release-docker
+bash scripts/paper-server-profile.sh start release
+bash scripts/paper-server-profile.sh stop release
 
 # dev Deploy
-docker compose -f compose.yaml -f compose.paper-server.yaml --profile deploy-dev up -d --build deploy-dev-docker deploy-dev-agent
-docker compose -f compose.yaml -f compose.paper-server.yaml stop deploy-dev-agent deploy-dev-docker
+bash scripts/paper-server-profile.sh start deploy-dev
+bash scripts/paper-server-profile.sh stop deploy-dev
 
 # test Deploy
-docker compose -f compose.yaml -f compose.paper-server.yaml --profile deploy-test up -d --build deploy-test-docker deploy-test-agent
-docker compose -f compose.yaml -f compose.paper-server.yaml stop deploy-test-agent deploy-test-docker
+bash scripts/paper-server-profile.sh start deploy-test
+bash scripts/paper-server-profile.sh stop deploy-test
 ```
+
+`start`成功时输出`PROFILE_LIFECYCLE_EVIDENCE ... action=start containers=2 node=online residue=0 status=OK`。全新启动在容器或节点超时时只回滚本次启动的目标Agent/DIND；已运行的目标profile重连失败时保持原状态并报告失败。`stop`先使用audit凭据检查Jenkins队列和executor，任一非空即拒绝；通过后只停止目标两个容器，等待节点offline并输出对应证据。管理员凭据只用于节点状态和重连，audit不调用节点重连或配置API；两个临时netrc均为0600并在退出时删除。脚本不执行`down --volumes`、宿主全局prune或跨profile清理。
+
+平台镜像定义发生变化时，应在队列为空且所有重型profile停止后，单独评审并构建目标Agent镜像；日常profile启停不隐式重建镜像。
 
 首次执行某个固定 SHA 前，先启动 Regression profile，再由 Linux 预加载器以只读 SCM Secret 获取该精确提交。预加载器仅在临时、被 Git 忽略的目录保存源码快照；依赖镜像在宿主机 Docker 中构建并导入隔离 DIND，宿主机不安装 Node.js、PowerShell 或项目运行时。缺失的固定输入镜像只在显式传入 `--pull-inputs`时拉取，拉取后仍必须匹配锁定 image ID。
 

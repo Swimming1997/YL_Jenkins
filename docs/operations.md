@@ -8,7 +8,7 @@ docker compose ps
 .\scripts\test-retention.ps1 -RegressionBuild 19
 ```
 
-正常状态要求 Controller、Build Agent、Regression Agent 和隔离 DIND 均为 `healthy`，Jenkins 队列无异常积压，Jenkins Home 与 DIND 文件系统使用率低于 90%，已完成的 scheduled project、Workspace 和兼容辅助文件无残留。
+本地完整拓扑运行时要求Controller、Build Agent、Regression Agent和隔离DIND均为`healthy`。paper-server基线只要求Controller、Build Agent和Registry为`healthy`；Regression、Release与两个Deploy Agent/DIND在没有受控任务时应停止。两种形态都要求Jenkins队列无异常积压，Jenkins Home与DIND文件系统使用率低于90%，已完成的scheduled project、Workspace和兼容辅助文件无残留。
 
 ## 运行残留治理
 
@@ -19,6 +19,8 @@ docker compose ps
 业务和维护 Job 的普通构建记录上限为 20，完整 Artifact 上限为 5；Keep Forever构建豁免。Regression 在归档后输出 `TRACE_RETENTION_EVIDENCE`，非 pin 的 Playwright trace 只保留最近两个失败构建且最长 7 天，其他 JSON、日志和截图继续遵守 Artifact保留策略。
 
 专用 DIND 维护使用 `Platform/Maintenance/dind-{regression,release,deploy-dev,deploy-test}`。`AUDIT`为默认只读模式；`APPLY`必须输入 `APPLY_DEDICATED_DIND_MAINTENANCE`。Regression 还必须提供当前和上一已验证完整 SHA，Job 会使用只读 Jenkins API 凭据核对最近成功回归的不同 SHA 顺序。执行前只启动目标 profile，确认队列为空；执行后停止 profile并保存 `DIND_MAINTENANCE_EVIDENCE`。
+
+paper-server重型profile统一使用`bash scripts/paper-server-profile.sh <start|stop|status> <profile>`。`start`拒绝其他重型profile和目标半启动状态，等待Docker健康并恢复既有Jenkins节点；`stop`在队列或任一executor活跃时失败关闭，只停止目标Agent/DIND。成功必须保存`PROFILE_LIFECYCLE_EVIDENCE`；超时、中断或精确回滚失败不得手工改写为通过。
 
 Maintenance 只能对固定 Agent 所连接的专用 TLS DIND执行。AUDIT 可以只读报告运行容器；APPLY 遇到目标运行容器或其他 Jenkins executor 活跃时必须拒绝。镜像命名越界、protected image 丢失或 APPLY 后 cache 仍超过 4 GiB时，Job 必须失败。不得从宿主执行等价的无范围 prune。
 
